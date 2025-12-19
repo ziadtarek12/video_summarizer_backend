@@ -1,0 +1,2 @@
+[console_scripts]
+video-summarizer = video_summarizer.cli.main:cli
