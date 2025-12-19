@@ -223,7 +223,7 @@ class GoogleAIClient:
             full_prompt = f"{system}\n\n{prompt}"
         
         generation_config = genai.types.GenerationConfig(
-            max_output_tokens=max_tokens or self.max_tokens,
+            max_output_tokens=max_tokens or 8000,
             temperature=temperature or self.temperature,
         )
         

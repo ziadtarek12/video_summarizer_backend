@@ -263,53 +263,7 @@ class SummarizeRequest(BaseModel):
 # ... (Previous routes) ...
 
 @app.post("/api/summarize")
-async def summarize(request: SummarizeRequest):
-    # This is relatively fast so we *could* do it synchronously, 
-    # but for consistency let's use a background job if it takes > 5-10s.
-    # LLM summarization can take 10-30s. So background job is better.
-    
-    job = create_job("summarize")
-    
-    # We can use a lambda or partial, but let's define a helper
-    async def run_summarization(job_id, req):
-        job = get_job(job_id)
-        job.update(JobStatus.PROCESSING)
-        
-        try:
-            # Get text
-            text = req.transcript_text
-            if not text and req.transcript_path:
-                with open(req.transcript_path, "r", encoding="utf-8") as f:
-                    # We might need to parse SRT if it's an SRT file
-                    # CLI does: plain_text = "\n".join(seg.text for seg in segments)
-                    # Let's assume the transcribe job saved a .txt version or we assume SRT handling
-                    # For simplicity, let's load SRT if .srt
-                    if req.transcript_path.endswith('.srt'):
-                        from video_summarizer.transcription.srt_formatter import load_srt
-                        segments = load_srt(req.transcript_path)
-                        text = "\n".join(seg.text for seg in segments)
-                    else:
-                        text = f.read()
-            
-            if not text:
-                raise Exception("No transcript provided or file is empty")
 
-            summarizer = VideoSummarizer(provider=req.provider, model=req.model)
-            summary = summarizer.summarize(text, output_language=req.output_language)
-            
-            result = {
-                "text": summary.text,
-                "key_points": summary.key_points
-            }
-            job.update(JobStatus.COMPLETED, result=result)
-            
-        except Exception as e:
-            job.update(JobStatus.FAILED, error=str(e))
-
-    # Add to existing background tasks mechanism in FastAPI
-    # (Since I need to pass this into the endpoint, I need to modify the signature)
-    # I'll modify the endpoint below.
-    return {"job_id": job.id, "status": "pending"}
 
 # Redefining the endpoint to include BackgroundTasks
 @app.post("/api/summarize")
@@ -320,20 +274,22 @@ async def summarize_endpoint(request: SummarizeRequest, background_tasks: Backgr
         job = get_job(job_id)
         job.update(JobStatus.PROCESSING)
         try:
-             # Get text
+            # Get text
+            job.update(JobStatus.PROCESSING, result={"step": "Loading transcript for summary..."})
             text = req.transcript_text
             if not text and req.transcript_path:
                 with open(req.transcript_path, "r", encoding="utf-8") as f:
                     if req.transcript_path.endswith('.srt'):
                         from video_summarizer.transcription.srt_formatter import load_srt
                         segments = load_srt(req.transcript_path)
-                        text = "\\n".join(seg.text for seg in segments)
+                        text = "\n".join(seg.text for seg in segments)
                     else:
                         text = f.read()
             
             if not text:
                 raise Exception("No transcript provided")
 
+            job.update(JobStatus.PROCESSING, result={"step": "Sending text to LLM (this may take 30s+)..."})
             summarizer = VideoSummarizer(provider=req.provider, model=req.model)
             summary = summarizer.summarize(text, output_language=req.output_language)
             
