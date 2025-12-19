@@ -85,6 +85,12 @@ def download_video(
     else:
         output_template = str(output_dir / "%(title)s.%(ext)s")
     
+    # Look for cookies.txt in project root
+    cookies_path = Path("cookies.txt").resolve()
+    if not cookies_path.exists():
+        # Try one level up (if running from src or similar)
+        cookies_path = Path("../cookies.txt").resolve()
+    
     ydl_opts = {
         "format": format_preference,
         "outtmpl": output_template,
@@ -92,7 +98,18 @@ def download_video(
         "no_warnings": True,
         "extract_flat": False,
         "merge_output_format": "mp4",
+        "nocheckcertificate": True,
+        "ignoreerrors": True,
+        "source_address": "0.0.0.0",
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios", "web"]
+            }
+        }
     }
+
+    if cookies_path.exists():
+        ydl_opts["cookiefile"] = str(cookies_path)
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

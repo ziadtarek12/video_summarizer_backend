@@ -70,6 +70,10 @@ Edit `.env` with your settings:
 # Choose provider: "google" or "openrouter"
 LLM_PROVIDER=google
 
+## Cookies (Optional)
+
+If you encounter "Sign in to confirm you’re not a bot" errors when downloading from YouTube, export your `cookies.txt` from a browser and place it in the project root directory. The application will automatically use it.
+
 # Google AI Studio (get key from https://aistudio.google.com/)
 GOOGLE_API_KEY=your_google_api_key
 GOOGLE_MODEL=gemini-1.5-flash
