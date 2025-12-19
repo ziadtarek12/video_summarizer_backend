@@ -86,10 +86,7 @@ def download_video(
         output_template = str(output_dir / "%(title)s.%(ext)s")
     
     # Look for cookies.txt in project root
-    cookies_path = Path("cookies.txt").resolve()
-    if not cookies_path.exists():
-        # Try one level up (if running from src or similar)
-        cookies_path = Path("../cookies.txt").resolve()
+    cookies_path = Path("/teamspace/studios/this_studio/video_summarizer_backend/cookies.txt")
     
     ydl_opts = {
         "format": format_preference,
