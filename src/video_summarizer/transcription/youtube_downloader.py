@@ -100,12 +100,6 @@ def download_video(
         "merge_output_format": "mp4",
         "nocheckcertificate": True,
         "ignoreerrors": True,
-        "source_address": "0.0.0.0",
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "ios", "web"]
-            }
-        }
     }
 
     if cookies_path.exists():
