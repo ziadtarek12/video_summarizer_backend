@@ -122,11 +122,17 @@ def transcribe(source: str, output: Optional[str], language: Optional[str], mode
     help="Output file path. Defaults to summary.txt in same directory.",
 )
 @click.option(
+    "--provider", "-p",
+    default=None,
+    type=click.Choice(["google", "openrouter"]),
+    help="LLM provider to use. Defaults to 'google'.",
+)
+@click.option(
     "--model", "-m",
     default=None,
-    help="OpenRouter model to use. Defaults to config value.",
+    help="LLM model to use. Defaults to config value.",
 )
-def summarize(transcript_path: str, output: Optional[str], model: Optional[str]):
+def summarize(transcript_path: str, output: Optional[str], provider: Optional[str], model: Optional[str]):
     """
     Summarize a video transcript.
     
@@ -157,7 +163,7 @@ def summarize(transcript_path: str, output: Optional[str], model: Optional[str])
     # Summarize
     click.echo("🤖 Generating summary...")
     try:
-        summarizer = VideoSummarizer(model=model)
+        summarizer = VideoSummarizer(provider=provider, model=model)
         summary = summarizer.summarize(transcript_text)
     except Exception as e:
         click.echo(f"❌ Summarization failed: {e}", err=True)
@@ -189,12 +195,19 @@ def summarize(transcript_path: str, output: Optional[str], model: Optional[str])
 @click.option(
     "--num-clips", "-n",
     default=5,
+    type=int,
     help="Number of clips to extract.",
+)
+@click.option(
+    "--provider", "-p",
+    default=None,
+    type=click.Choice(["google", "openrouter"]),
+    help="LLM provider to use. Defaults to 'google'.",
 )
 @click.option(
     "--model", "-m",
     default=None,
-    help="OpenRouter model to use. Defaults to config value.",
+    help="LLM model to use. Defaults to config value.",
 )
 @click.option(
     "--reencode/--no-reencode",
@@ -206,6 +219,7 @@ def extract_clips_cmd(
     video: str,
     output_dir: Optional[str],
     num_clips: int,
+    provider: Optional[str],
     model: Optional[str],
     reencode: bool,
 ):
@@ -244,7 +258,7 @@ def extract_clips_cmd(
     # Extract clips using LLM
     click.echo(f"🤖 Identifying {num_clips} best clips...")
     try:
-        summarizer = VideoSummarizer(model=model)
+        summarizer = VideoSummarizer(provider=provider, model=model)
         clips = summarizer.extract_clips(srt_content, num_clips=num_clips)
     except Exception as e:
         click.echo(f"❌ Clip extraction failed: {e}", err=True)
@@ -282,6 +296,7 @@ def extract_clips_cmd(
 @click.option(
     "--num-clips", "-n",
     default=5,
+    type=int,
     help="Number of clips to extract.",
 )
 @click.option(
@@ -295,9 +310,15 @@ def extract_clips_cmd(
     help="Whisper model to use. Defaults to config value.",
 )
 @click.option(
+    "--provider", "-p",
+    default=None,
+    type=click.Choice(["google", "openrouter"]),
+    help="LLM provider to use. Defaults to 'google'.",
+)
+@click.option(
     "--llm-model",
     default=None,
-    help="OpenRouter model to use. Defaults to config value.",
+    help="LLM model to use. Defaults to config value.",
 )
 @click.option(
     "--reencode/--no-reencode",
@@ -310,6 +331,7 @@ def process(
     num_clips: int,
     language: Optional[str],
     whisper_model: Optional[str],
+    provider: Optional[str],
     llm_model: Optional[str],
     reencode: bool,
 ):
@@ -391,7 +413,7 @@ def process(
     summary_path = output_dir / "summary.txt"
     
     try:
-        summarizer = VideoSummarizer(model=llm_model)
+        summarizer = VideoSummarizer(provider=provider, model=llm_model)
         summary = summarizer.summarize(plain_text)
         
         with open(summary_path, "w", encoding="utf-8") as f:

@@ -2,37 +2,41 @@
 Video summarization and clip extraction using LLM.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Union
 
-from video_summarizer.llm.client import OpenRouterClient
+from video_summarizer.llm.client import get_llm_client, LLMClient, GoogleAIClient, OpenRouterClient
 from video_summarizer.llm.models import Clip, Summary
 from video_summarizer.llm.prompts import get_summarize_prompt, get_extract_clips_prompt
+from video_summarizer.config import get_config
 
 
 class VideoSummarizer:
     """
     Handles video summarization and clip extraction using an LLM.
     
-    Uses OpenRouter to access various LLMs for analyzing video transcripts,
-    generating summaries, and identifying key clips to extract.
+    Supports both Google AI Studio (Gemini) and OpenRouter for LLM access.
     """
     
     def __init__(
         self,
-        client: Optional[OpenRouterClient] = None,
+        client: Optional[LLMClient] = None,
+        provider: Optional[str] = None,
         model: Optional[str] = None,
+        api_key: Optional[str] = None,
     ):
         """
         Initialize the video summarizer.
         
         Args:
-            client: Optional pre-configured OpenRouterClient.
+            client: Optional pre-configured LLM client.
+            provider: LLM provider ("google" or "openrouter"). Defaults to config.
             model: Optional model override.
+            api_key: Optional API key override.
         """
         if client:
             self.client = client
         else:
-            self.client = OpenRouterClient(model=model)
+            self.client = get_llm_client(provider=provider, model=model, api_key=api_key)
     
     def summarize(self, transcript: str) -> Summary:
         """

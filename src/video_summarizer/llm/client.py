@@ -1,24 +1,33 @@
 """
-OpenRouter API client using OpenAI-compatible interface.
+LLM client factory supporting multiple providers.
 """
 
 import time
-from typing import Optional
+from typing import Optional, Protocol
 
 from video_summarizer.config import LLMConfig, get_config
 
 
-class OpenRouterError(Exception):
-    """Raised when OpenRouter API calls fail."""
+class LLMClientError(Exception):
+    """Raised when LLM API calls fail."""
     pass
+
+
+class LLMClient(Protocol):
+    """Protocol for LLM clients."""
+    
+    def complete(self, prompt: str, system: Optional[str] = None) -> str:
+        """Send a completion request."""
+        ...
+    
+    def complete_json(self, prompt: str, system: Optional[str] = None) -> dict:
+        """Send a completion request expecting JSON response."""
+        ...
 
 
 class OpenRouterClient:
     """
     Client for OpenRouter API using OpenAI-compatible interface.
-    
-    OpenRouter provides access to various LLMs through a unified API
-    that's compatible with the OpenAI client library.
     """
     
     def __init__(
@@ -29,40 +38,29 @@ class OpenRouterClient:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
     ):
-        """
-        Initialize the OpenRouter client.
-        
-        Args:
-            api_key: OpenRouter API key. Defaults to config value.
-            model: Model to use. Defaults to config value.
-            base_url: API base URL. Defaults to OpenRouter's URL.
-            max_tokens: Maximum tokens in response. Defaults to config value.
-            temperature: Sampling temperature. Defaults to config value.
-        """
         config = get_config().llm
         
-        self.api_key = api_key or config.api_key
-        self.model = model or config.model
-        self.base_url = base_url or config.base_url
+        self.api_key = api_key or config.openrouter_api_key
+        self.model = model or config.openrouter_model
+        self.base_url = base_url or config.openrouter_base_url
         self.max_tokens = max_tokens or config.max_tokens
         self.temperature = temperature or config.temperature
         
         self._client = None
     
     def _get_client(self):
-        """Lazy load the OpenAI client."""
         if self._client is not None:
             return self._client
         
         if not self.api_key:
-            raise OpenRouterError(
+            raise LLMClientError(
                 "OpenRouter API key is required. Set OPENROUTER_API_KEY environment variable."
             )
         
         try:
             from openai import OpenAI
         except ImportError:
-            raise OpenRouterError(
+            raise LLMClientError(
                 "openai package is not installed. Install it with: pip install openai"
             )
         
@@ -82,23 +80,6 @@ class OpenRouterClient:
         max_retries: int = 3,
         retry_delay: float = 1.0,
     ) -> str:
-        """
-        Send a completion request to OpenRouter.
-        
-        Args:
-            prompt: The user prompt.
-            system: Optional system prompt.
-            max_tokens: Override default max tokens.
-            temperature: Override default temperature.
-            max_retries: Number of retries on failure.
-            retry_delay: Delay between retries in seconds.
-        
-        Returns:
-            The model's response text.
-        
-        Raises:
-            OpenRouterError: If the API call fails after retries.
-        """
         client = self._get_client()
         
         messages = []
@@ -124,7 +105,7 @@ class OpenRouterClient:
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay * (attempt + 1))
         
-        raise OpenRouterError(f"API call failed after {max_retries} retries: {last_error}")
+        raise LLMClientError(f"API call failed after {max_retries} retries: {last_error}")
     
     def complete_json(
         self,
@@ -132,51 +113,170 @@ class OpenRouterClient:
         system: Optional[str] = None,
         max_tokens: Optional[int] = None,
     ) -> dict:
-        """
-        Send a completion request expecting JSON response.
-        
-        Args:
-            prompt: The user prompt (should ask for JSON).
-            system: Optional system prompt.
-            max_tokens: Override default max tokens.
-        
-        Returns:
-            Parsed JSON response as a dictionary.
-        
-        Raises:
-            OpenRouterError: If the API call fails or JSON parsing fails.
-        """
         import json
+        import re
         
         response = self.complete(
             prompt=prompt,
             system=system,
             max_tokens=max_tokens,
-            temperature=0.3,  # Lower temperature for structured output
+            temperature=0.3,
         )
         
-        # Try to extract JSON from the response
+        return _parse_json_response(response)
+
+
+class GoogleAIClient:
+    """
+    Client for Google AI Studio (Gemini) API.
+    """
+    
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+    ):
+        config = get_config().llm
+        
+        self.api_key = api_key or config.google_api_key
+        self.model = model or config.google_model
+        self.max_tokens = max_tokens or config.max_tokens
+        self.temperature = temperature or config.temperature
+        
+        self._client = None
+    
+    def _get_client(self):
+        if self._client is not None:
+            return self._client
+        
+        if not self.api_key:
+            raise LLMClientError(
+                "Google API key is required. Set GOOGLE_API_KEY environment variable."
+            )
+        
         try:
-            # First, try direct parsing
-            return json.loads(response)
+            import google.generativeai as genai
+        except ImportError:
+            raise LLMClientError(
+                "google-generativeai package is not installed. Install it with: pip install google-generativeai"
+            )
+        
+        genai.configure(api_key=self.api_key)
+        self._client = genai.GenerativeModel(self.model)
+        
+        return self._client
+    
+    def complete(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+    ) -> str:
+        import google.generativeai as genai
+        
+        client = self._get_client()
+        
+        # Combine system prompt with user prompt for Gemini
+        full_prompt = prompt
+        if system:
+            full_prompt = f"{system}\n\n{prompt}"
+        
+        generation_config = genai.types.GenerationConfig(
+            max_output_tokens=max_tokens or self.max_tokens,
+            temperature=temperature or self.temperature,
+        )
+        
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                response = client.generate_content(
+                    full_prompt,
+                    generation_config=generation_config,
+                )
+                
+                return response.text
+                
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))
+        
+        raise LLMClientError(f"API call failed after {max_retries} retries: {last_error}")
+    
+    def complete_json(
+        self,
+        prompt: str,
+        system: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+    ) -> dict:
+        response = self.complete(
+            prompt=prompt,
+            system=system,
+            max_tokens=max_tokens,
+            temperature=0.3,
+        )
+        
+        return _parse_json_response(response)
+
+
+def _parse_json_response(response: str) -> dict:
+    """Parse JSON from LLM response, handling various formats."""
+    import json
+    import re
+    
+    # Try direct parsing
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError:
+        pass
+    
+    # Try to find JSON in markdown code blocks
+    json_match = re.search(r'```(?:json)?\s*\n([\s\S]*?)\n```', response)
+    if json_match:
+        try:
+            return json.loads(json_match.group(1))
         except json.JSONDecodeError:
             pass
-        
-        # Try to find JSON in markdown code blocks
-        import re
-        json_match = re.search(r'```(?:json)?\s*\n([\s\S]*?)\n```', response)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
-        
-        # Try to find JSON object/array in the response
-        json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', response)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
-        
-        raise OpenRouterError(f"Failed to parse JSON from response: {response[:500]}")
+    
+    # Try to find JSON object/array in the response
+    json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', response)
+    if json_match:
+        try:
+            return json.loads(json_match.group(1))
+        except json.JSONDecodeError:
+            pass
+    
+    raise LLMClientError(f"Failed to parse JSON from response: {response[:500]}")
+
+
+def get_llm_client(
+    provider: Optional[str] = None,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+) -> LLMClient:
+    """
+    Factory function to get the appropriate LLM client.
+    
+    Args:
+        provider: "google" or "openrouter". Defaults to config value.
+        api_key: Optional API key override.
+        model: Optional model override.
+    
+    Returns:
+        Configured LLM client.
+    """
+    config = get_config().llm
+    provider = provider or config.provider
+    
+    if provider == "google":
+        return GoogleAIClient(api_key=api_key, model=model)
+    elif provider == "openrouter":
+        return OpenRouterClient(api_key=api_key, model=model)
+    else:
+        raise LLMClientError(f"Unknown provider: {provider}. Use 'google' or 'openrouter'.")
