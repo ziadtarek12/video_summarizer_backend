@@ -18,6 +18,7 @@ const els = {
     uploadBtn: document.getElementById('uploadBtn'),
     videoFileInput: document.getElementById('videoFileInput'),
     statusMessage: document.getElementById('statusMessage'),
+    logsArea: document.getElementById('logsArea'),
     resultsArea: document.getElementById('resultsArea'),
     videoPlayer: document.getElementById('videoPlayer'),
     videoTitle: document.getElementById('videoTitle'),
@@ -46,9 +47,23 @@ const setStatus = (msg, loading = true) => {
         : msg;
 };
 
+const addLog = (msg) => {
+    els.logsArea.classList.remove('hidden');
+    const logEl = document.createElement('div');
+    const timestamp = new Date().toLocaleTimeString();
+    logEl.innerHTML = `<span class="text-white/40">[${timestamp}]</span> ${msg}`;
+    els.logsArea.querySelector('div').appendChild(logEl);
+    logEl.scrollIntoView({ behavior: 'smooth' });
+};
+
+const clearLogs = () => {
+    els.logsArea.classList.add('hidden');
+    els.logsArea.querySelector('div').innerHTML = '';
+};
+
 const showError = (msg) => {
     setStatus(`<span class="text-red-400">Error: ${msg}</span>`, false);
-    setTimeout(() => setStatus(null), 5000);
+    addLog(`Error: ${msg}`);
 };
 
 const formatTime = (seconds) => {
@@ -56,17 +71,28 @@ const formatTime = (seconds) => {
 };
 
 const handleTranscriptionResult = async (transcribeJob) => {
-    const transcribeResult = await VideoSummarizerAPI.pollJob(transcribeJob.job_id);
+    addLog("Transcription job started... polling for status.");
+    const transcribeResult = await VideoSummarizerAPI.pollJob(transcribeJob.job_id, 2000, (step) => {
+        setStatus(step);
+        const lastLog = els.logsArea.querySelector('div').lastElementChild?.textContent;
+        // Basic deduping to avoid spamming the log
+        if (!lastLog || !lastLog.includes(step)) {
+            addLog(step);
+        }
+    });
+    addLog("Transcription completed successfully.");
 
     state.videoPath = transcribeResult.result.video_path;
     state.transcriptPath = transcribeResult.result.transcript_path;
 
     // 2. Summarize
     setStatus('Generating summary...');
+    addLog("Generating summary...");
     const summarizeJob = await VideoSummarizerAPI.summarize({
         transcript_path: state.transcriptPath
     });
     const summaryResult = await VideoSummarizerAPI.pollJob(summarizeJob.job_id);
+    addLog("Summary generated.");
 
     state.transcriptText = "Transcript loaded via backend";
 
@@ -74,12 +100,14 @@ const handleTranscriptionResult = async (transcribeJob) => {
     renderSummary(summaryResult.result);
 
     // Start Chat Session
+    addLog("Starting chat session...");
     const chatSession = await VideoSummarizerAPI.startChat({
         transcript_path: state.transcriptPath
     });
     state.sessionId = chatSession.session_id;
 
     // Extract Clips (Background)
+    addLog("Starting clip extraction (background)...");
     extractClips();
 
     // Show Results
@@ -95,9 +123,11 @@ const processVideo = async () => {
     try {
         els.processBtn.disabled = true;
         els.resultsArea.classList.add('hidden');
+        clearLogs();
 
         // 1. Transcribe
-        setStatus('Downloading and Transcribing video...');
+        setStatus('Initializing...');
+        addLog(`Initializing request for URL: ${url}`);
         const transcribeJob = await VideoSummarizerAPI.transcribe(url);
         await handleTranscriptionResult(transcribeJob);
 
@@ -127,9 +157,11 @@ const processFile = async (e) => {
     try {
         els.uploadBtn.disabled = true;
         els.resultsArea.classList.add('hidden');
+        clearLogs();
 
         // 1. Upload and Transcribe
-        setStatus('Uploading and Transcribing video...');
+        setStatus('Uploading file...');
+        addLog(`Uploading file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
         const transcribeJob = await VideoSummarizerAPI.transcribeFile(file);
         await handleTranscriptionResult(transcribeJob);
 

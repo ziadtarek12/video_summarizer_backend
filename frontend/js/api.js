@@ -93,11 +93,16 @@ export class VideoSummarizerAPI {
     }
 
     // Helper to poll until completion
-    static async pollJob(jobId, interval = 2000) {
+    static async pollJob(jobId, interval = 2000, onProgress = null) {
         return new Promise((resolve, reject) => {
             const check = async () => {
                 try {
                     const status = await this.getJobStatus(jobId);
+
+                    if (onProgress && status.result && status.result.step) {
+                        onProgress(status.result.step);
+                    }
+
                     if (status.status === 'completed') {
                         resolve(status);
                     } else if (status.status === 'failed') {

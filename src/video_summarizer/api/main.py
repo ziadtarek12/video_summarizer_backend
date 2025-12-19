@@ -76,21 +76,21 @@ def process_transcription(job_id: str, source: str, model: str, language: str, d
         video_path = source
         if is_youtube_url(source):
             try:
-                # job.update(JobStatus.PROCESSING, result={"step": "Downloading video..."})
+                job.update(JobStatus.PROCESSING, result={"step": "Downloading video... (may take a minute)"})
                 video_path = download_video(source, output_dir=str(output_dir))
                 job.files["video"] = video_path
             except Exception as e:
                 raise Exception(f"Download failed: {str(e)}")
         
         # 2. Extract Audio
-        # job.update(JobStatus.PROCESSING, result={"step": "Extracting audio..."})
+        job.update(JobStatus.PROCESSING, result={"step": "Extracting audio from video..."})
         try:
             audio_path = extract_audio(video_path)
         except Exception as e:
             raise Exception(f"Audio extraction failed: {str(e)}")
             
         # 3. Transcribe
-        # job.update(JobStatus.PROCESSING, result={"step": "Transcribing..."})
+        job.update(JobStatus.PROCESSING, result={"step": "Transcribing audio (this is the longest step)..."})
         try:
             transcriber = WhisperTranscriber(model=model, language=language, device=device)
             # This is blocking, might take a while
@@ -103,7 +103,7 @@ def process_transcription(job_id: str, source: str, model: str, language: str, d
             
             # Save Raw Text (for summary later)
             text_path = output_dir / "transcript.txt"
-            plain_text = "\\n".join(seg.text for seg in segments)
+            plain_text = "\n".join(seg.text for seg in segments)
             with open(text_path, "w", encoding="utf-8") as f:
                 f.write(plain_text)
             job.files["text"] = str(text_path)
@@ -116,7 +116,8 @@ def process_transcription(job_id: str, source: str, model: str, language: str, d
                 os.unlink(audio_path)
 
         job.update(JobStatus.COMPLETED, result={
-            "message": "Transcription successful", 
+            "message": "Transcription successful",
+            "step": "Completed",
             "video_path": video_path,
             "transcript_path": str(srt_path),
             "segments_count": len(segments)
