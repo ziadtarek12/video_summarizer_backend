@@ -1,4 +1,4 @@
-import { VideoSummarizerAPI } from './api.js';
+import { VideoSummarizerAPI } from './api.js?v=2';
 import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 
 
