@@ -6,7 +6,7 @@ from typing import Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -201,6 +201,35 @@ async def transcribe_url(request: TranscribeRequest, background_tasks: Backgroun
         request.model, 
         request.language, 
         request.device
+    )
+    return {"job_id": job.id, "status": "pending"}
+
+@app.post("/api/transcribe/file")
+async def transcribe_file(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    language: Optional[str] = Form(None),
+    model: Optional[str] = Form(None),
+    device: Optional[str] = Form("auto")
+):
+    job = create_job("transcribe")
+    
+    # Create job dir
+    job_dir = Path(f"output/{job.id}")
+    job_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save file
+    file_path = job_dir / file.filename
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    background_tasks.add_task(
+        process_transcription, 
+        job.id, 
+        str(file_path), 
+        model, 
+        language, 
+        device
     )
     return {"job_id": job.id, "status": "pending"}
 

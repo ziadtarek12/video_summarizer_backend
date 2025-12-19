@@ -15,6 +15,8 @@ let state = {
 const els = {
     videoUrl: document.getElementById('videoUrl'),
     processBtn: document.getElementById('processBtn'),
+    uploadBtn: document.getElementById('uploadBtn'),
+    videoFileInput: document.getElementById('videoFileInput'),
     statusMessage: document.getElementById('statusMessage'),
     resultsArea: document.getElementById('resultsArea'),
     videoPlayer: document.getElementById('videoPlayer'),
@@ -53,6 +55,38 @@ const formatTime = (seconds) => {
     return new Date(seconds * 1000).toISOString().substr(11, 8);
 };
 
+const handleTranscriptionResult = async (transcribeJob) => {
+    const transcribeResult = await VideoSummarizerAPI.pollJob(transcribeJob.job_id);
+
+    state.videoPath = transcribeResult.result.video_path;
+    state.transcriptPath = transcribeResult.result.transcript_path;
+
+    // 2. Summarize
+    setStatus('Generating summary...');
+    const summarizeJob = await VideoSummarizerAPI.summarize({
+        transcript_path: state.transcriptPath
+    });
+    const summaryResult = await VideoSummarizerAPI.pollJob(summarizeJob.job_id);
+
+    state.transcriptText = "Transcript loaded via backend";
+
+    // Render Summary
+    renderSummary(summaryResult.result);
+
+    // Start Chat Session
+    const chatSession = await VideoSummarizerAPI.startChat({
+        transcript_path: state.transcriptPath
+    });
+    state.sessionId = chatSession.session_id;
+
+    // Extract Clips (Background)
+    extractClips();
+
+    // Show Results
+    els.resultsArea.classList.remove('hidden');
+    setStatus(null);
+};
+
 // Main Flow
 const processVideo = async () => {
     const url = els.videoUrl.value.trim();
@@ -65,43 +99,9 @@ const processVideo = async () => {
         // 1. Transcribe
         setStatus('Downloading and Transcribing video...');
         const transcribeJob = await VideoSummarizerAPI.transcribe(url);
-        const transcribeResult = await VideoSummarizerAPI.pollJob(transcribeJob.job_id);
+        await handleTranscriptionResult(transcribeJob);
 
-        state.videoPath = transcribeResult.result.video_path;
-        state.transcriptPath = transcribeResult.result.transcript_path;
-
-        // Load transcript text (assuming we can get it or use the path)
-        // For simplicity, we might need a way to fetch the text content if the API didn't return it
-        // The API returns 'text' file path in result.files usually, but let's assume we use the summarizer to get text
-        // Actually, let's fetch the transcript text from the file if served, or just pass the path to summarizer
-
-        // 2. Summarize
-        setStatus('Generating summary...');
-        const summarizeJob = await VideoSummarizerAPI.summarize({
-            transcript_path: state.transcriptPath
-        });
-        const summaryResult = await VideoSummarizerAPI.pollJob(summarizeJob.job_id);
-
-        state.transcriptText = "Transcript loaded via backend"; // we don't have the text directly yet unless we fetch it.
-
-        // Render Summary
-        renderSummary(summaryResult.result);
-
-        // Start Chat Session
-        const chatSession = await VideoSummarizerAPI.startChat({
-            transcript_path: state.transcriptPath
-        });
-        state.sessionId = chatSession.session_id;
-
-        // Extract Clips (Background)
-        extractClips();
-
-        // Show Results
-        els.resultsArea.classList.remove('hidden');
-        setStatus(null);
-
-        // Setup Video Player
-
+        // Setup Video Player (YouTube)
         let videoId = null;
         if (url.includes('v=')) {
             videoId = url.split('v=')[1]?.split('&')[0];
@@ -120,28 +120,38 @@ const processVideo = async () => {
     }
 };
 
-const extractClips = async () => {
-    try {
-        const job = await VideoSummarizerAPI.extractClips(state.videoPath, state.transcriptPath);
-        // We can poll or just let it finish. Let's poll to show them when ready.
-        // For now, we won't block UI.
-    } catch (e) {
-        console.error("Clip extraction failed", e);
-    }
-};
+const processFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-const renderSummary = (data) => {
     try {
-        const html = marked.parse(data.text);
-        els.summaryContent.innerHTML = html;
+        els.uploadBtn.disabled = true;
+        els.resultsArea.classList.add('hidden');
+
+        // 1. Upload and Transcribe
+        setStatus('Uploading and Transcribing video...');
+        const transcribeJob = await VideoSummarizerAPI.transcribeFile(file);
+        await handleTranscriptionResult(transcribeJob);
+
+        // Setup Video Player (Local File - strict browser policies might prevent direct play from path)
+        // Ideally we serve the file via static mount
+        // For now, let's just show a placeholder or try to serve if possible
+        els.videoPlayer.src = '';
+        // We could mount the output dir and point to it: /output/{jobId}/{filename}
+
     } catch (e) {
-        console.error("Markdown parsing failed", e);
-        els.summaryContent.textContent = data.text;
+        showError(e.message);
+    } finally {
+        els.uploadBtn.disabled = false;
+        // Reset input
+        els.videoFileInput.value = '';
     }
 };
 
 // Event Listeners
 els.processBtn.addEventListener('click', processVideo);
+els.uploadBtn.addEventListener('click', () => els.videoFileInput.click());
+els.videoFileInput.addEventListener('change', processFile);
 
 window.switchTab = (tabName) => {
     Object.values(els.tabs).forEach(el => el.classList.add('hidden'));

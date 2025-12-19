@@ -12,6 +12,18 @@ export class VideoSummarizerAPI {
         return await response.json();
     }
 
+    static async transcribeFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${API_BASE}/api/transcribe/file`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) throw new Error('File transcription request failed');
+        return await response.json();
+    }
+
     static async getJobStatus(jobId) {
         const response = await fetch(`${API_BASE}/api/jobs/${jobId}`);
         if (!response.ok) throw new Error('Failed to get job status');
