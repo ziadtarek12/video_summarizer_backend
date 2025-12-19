@@ -1,0 +1,131 @@
+"""
+Video summarization and clip extraction using LLM.
+"""
+
+from typing import List, Optional
+
+from video_summarizer.llm.client import OpenRouterClient
+from video_summarizer.llm.models import Clip, Summary
+from video_summarizer.llm.prompts import get_summarize_prompt, get_extract_clips_prompt
+
+
+class VideoSummarizer:
+    """
+    Handles video summarization and clip extraction using an LLM.
+    
+    Uses OpenRouter to access various LLMs for analyzing video transcripts,
+    generating summaries, and identifying key clips to extract.
+    """
+    
+    def __init__(
+        self,
+        client: Optional[OpenRouterClient] = None,
+        model: Optional[str] = None,
+    ):
+        """
+        Initialize the video summarizer.
+        
+        Args:
+            client: Optional pre-configured OpenRouterClient.
+            model: Optional model override.
+        """
+        if client:
+            self.client = client
+        else:
+            self.client = OpenRouterClient(model=model)
+    
+    def summarize(self, transcript: str) -> Summary:
+        """
+        Generate a summary of the video from its transcript.
+        
+        Args:
+            transcript: The video transcript (plain text or SRT).
+        
+        Returns:
+            Summary object with text and key points.
+        """
+        system_prompt, user_prompt = get_summarize_prompt(transcript)
+        
+        response = self.client.complete_json(
+            prompt=user_prompt,
+            system=system_prompt,
+        )
+        
+        return Summary(
+            text=response.get("summary", ""),
+            key_points=response.get("key_points", []),
+        )
+    
+    def extract_clips(
+        self,
+        transcript: str,
+        num_clips: int = 5,
+        min_duration: float = 10.0,
+        max_duration: float = 120.0,
+    ) -> List[Clip]:
+        """
+        Extract important clips from the video based on its transcript.
+        
+        Args:
+            transcript: The video transcript in SRT format (with timestamps).
+            num_clips: Number of clips to extract.
+            min_duration: Minimum clip duration in seconds.
+            max_duration: Maximum clip duration in seconds.
+        
+        Returns:
+            List of Clip objects with timestamps and metadata.
+        """
+        system_prompt, user_prompt = get_extract_clips_prompt(transcript, num_clips)
+        
+        response = self.client.complete_json(
+            prompt=user_prompt,
+            system=system_prompt,
+        )
+        
+        clips = []
+        raw_clips = response.get("clips", [])
+        
+        for clip_data in raw_clips:
+            try:
+                clip = Clip.from_dict(clip_data)
+                
+                # Filter by duration constraints
+                if min_duration <= clip.duration <= max_duration:
+                    clips.append(clip)
+                elif clip.duration < min_duration:
+                    # Extend short clips if possible
+                    clip.end = clip.start + min_duration
+                    clips.append(clip)
+                elif clip.duration > max_duration:
+                    # Truncate long clips
+                    clip.end = clip.start + max_duration
+                    clips.append(clip)
+                    
+            except (KeyError, ValueError) as e:
+                # Skip invalid clip data
+                continue
+        
+        # Sort by importance (highest first)
+        clips.sort(key=lambda c: c.importance, reverse=True)
+        
+        return clips[:num_clips]
+    
+    def process(
+        self,
+        transcript: str,
+        num_clips: int = 5,
+    ) -> tuple[Summary, List[Clip]]:
+        """
+        Process a transcript to generate both summary and clips.
+        
+        Args:
+            transcript: The video transcript in SRT format.
+            num_clips: Number of clips to extract.
+        
+        Returns:
+            Tuple of (Summary, List[Clip]).
+        """
+        summary = self.summarize(transcript)
+        clips = self.extract_clips(transcript, num_clips=num_clips)
+        
+        return summary, clips
