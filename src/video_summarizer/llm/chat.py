@@ -95,6 +95,41 @@ Instructions:
         
         return response
     
+    def chat_stream(self, message: str):
+        """
+        Send a message and stream the response.
+        
+        Args:
+            message: The user's message.
+        
+        Yields:
+            str: Tokens/chunks of the response as they arrive.
+        """
+        # Add user message to history
+        self.history.append(ChatMessage(role="user", content=message))
+        
+        # Build prompt with context
+        context = self._build_context()
+        system_prompt = self._get_system_prompt()
+        
+        # Create user prompt with history context
+        if len(self.history) > 1:
+            user_prompt = f"{context}\n\nUser: {message}\n\nAssistant:"
+        else:
+            user_prompt = f"User question: {message}"
+        
+        # Stream response
+        full_response = ""
+        for token in self.client.complete_stream(
+            prompt=user_prompt,
+            system=system_prompt,
+        ):
+            full_response += token
+            yield token
+        
+        # Add complete assistant response to history
+        self.history.append(ChatMessage(role="assistant", content=full_response))
+    
     def clear_history(self) -> None:
         """Clear the conversation history."""
         self.history = []

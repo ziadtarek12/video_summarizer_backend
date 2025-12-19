@@ -579,12 +579,14 @@ def chat(transcript_path: str, provider: Optional[str], model: Optional[str]):
         if not user_input.strip():
             continue
         
-        # Get response
+        # Get streaming response
         try:
-            response = session.chat(user_input)
-            click.echo(f"\n🤖 Assistant: {response}\n")
+            click.echo("\n🤖 Assistant: ", nl=False)
+            for token in session.chat_stream(user_input):
+                click.echo(token, nl=False)
+            click.echo("\n")  # Add newlines after response
         except Exception as e:
-            click.echo(f"❌ Error: {e}\n", err=True)
+            click.echo(f"\n❌ Error: {e}\n", err=True)
 
 
 if __name__ == "__main__":
