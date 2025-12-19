@@ -2,15 +2,27 @@
 Prompt templates for video summarization and clip extraction.
 """
 
-SUMMARIZE_SYSTEM_PROMPT = """You are an expert video content analyst. Your task is to analyze video transcripts and provide comprehensive summaries.
+# Language instructions
+LANGUAGE_ORIGINAL = """Always respond in the same language as the transcript."""
+LANGUAGE_ENGLISH = """Always respond in English, regardless of the transcript language. Translate any non-English content."""
+
+
+def _get_language_instruction(output_language: str) -> str:
+    """Get the language instruction based on user choice."""
+    if output_language == "english":
+        return LANGUAGE_ENGLISH
+    return LANGUAGE_ORIGINAL
+
+
+SUMMARIZE_SYSTEM_PROMPT_TEMPLATE = """You are an expert video content analyst. Your task is to analyze video transcripts and provide comprehensive summaries.
 
 You should:
 1. Identify the main topic and themes of the video
 2. Extract the most important points and insights
 3. Summarize the content clearly and concisely
-4. Preserve the original language and cultural context
+4. Preserve the cultural context
 
-Always respond in the same language as the transcript."""
+{language_instruction}"""
 
 SUMMARIZE_USER_PROMPT = """Please analyze the following video transcript and provide:
 
@@ -72,18 +84,23 @@ Respond with a JSON array of clips:
 Important: Use the exact timestamps from the SRT entries. The start and end should be in seconds (float)."""
 
 
-def get_summarize_prompt(transcript: str) -> tuple[str, str]:
+def get_summarize_prompt(transcript: str, output_language: str = "original") -> tuple[str, str]:
     """
     Get the system and user prompts for summarization.
     
     Args:
         transcript: The video transcript text.
+        output_language: "original" to keep video language, "english" to translate.
     
     Returns:
         Tuple of (system_prompt, user_prompt).
     """
+    language_instruction = _get_language_instruction(output_language)
+    system_prompt = SUMMARIZE_SYSTEM_PROMPT_TEMPLATE.format(
+        language_instruction=language_instruction
+    )
     return (
-        SUMMARIZE_SYSTEM_PROMPT,
+        system_prompt,
         SUMMARIZE_USER_PROMPT.format(transcript=transcript),
     )
 

@@ -186,3 +186,96 @@ def load_clips_metadata(path: Union[str, Path]) -> List[Clip]:
         data = json.load(f)
     
     return [Clip.from_dict(clip_data) for clip_data in data.get("clips", [])]
+
+
+def merge_clips(
+    clip_paths: List[str],
+    output_path: str,
+    reencode: bool = True,
+) -> str:
+    """
+    Merge multiple video clips into a single video file.
+    
+    Args:
+        clip_paths: List of paths to video clips (in order).
+        output_path: Path for the merged output video.
+        reencode: If True, re-encode for consistent output. If False, use concat demuxer.
+    
+    Returns:
+        Path to the merged video.
+    
+    Raises:
+        ClipExtractionError: If FFmpeg fails.
+    """
+    import tempfile
+    
+    if not clip_paths:
+        raise ClipExtractionError("No clips provided for merging")
+    
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    if reencode:
+        # Use filter_complex for re-encoding (more compatible)
+        # Build input arguments
+        input_args = []
+        filter_parts = []
+        
+        for i, clip in enumerate(clip_paths):
+            input_args.extend(["-i", str(clip)])
+            filter_parts.append(f"[{i}:v][{i}:a]")
+        
+        filter_str = "".join(filter_parts) + f"concat=n={len(clip_paths)}:v=1:a=1[outv][outa]"
+        
+        cmd = [
+            "ffmpeg",
+            *input_args,
+            "-filter_complex", filter_str,
+            "-map", "[outv]",
+            "-map", "[outa]",
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-y",
+            str(output_path),
+        ]
+    else:
+        # Use concat demuxer (faster, but requires same codec)
+        # Create a temporary concat file
+        fd, concat_file = tempfile.mkstemp(suffix=".txt")
+        try:
+            with os.fdopen(fd, "w") as f:
+                for clip in clip_paths:
+                    # Escape single quotes in path
+                    escaped_path = str(Path(clip).absolute()).replace("'", "'\\''")
+                    f.write(f"file '{escaped_path}'\n")
+            
+            cmd = [
+                "ffmpeg",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", concat_file,
+                "-c", "copy",
+                "-y",
+                str(output_path),
+            ]
+            
+            try:
+                subprocess.run(cmd, capture_output=True, text=True, check=True)
+            except subprocess.CalledProcessError as e:
+                raise ClipExtractionError(f"FFmpeg merge failed: {e.stderr}") from e
+            
+            return str(output_path)
+        finally:
+            os.unlink(concat_file)
+    
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise ClipExtractionError(f"FFmpeg merge failed: {e.stderr}") from e
+    except FileNotFoundError:
+        raise ClipExtractionError(
+            "FFmpeg not found. Please install FFmpeg and ensure it's in your PATH."
+        )
+    
+    return str(output_path)
+

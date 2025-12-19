@@ -38,17 +38,18 @@ class VideoSummarizer:
         else:
             self.client = get_llm_client(provider=provider, model=model, api_key=api_key)
     
-    def summarize(self, transcript: str) -> Summary:
+    def summarize(self, transcript: str, output_language: str = "original") -> Summary:
         """
         Generate a summary of the video from its transcript.
         
         Args:
             transcript: The video transcript (plain text or SRT).
+            output_language: "original" for video language, "english" to translate.
         
         Returns:
             Summary object with text and key points.
         """
-        system_prompt, user_prompt = get_summarize_prompt(transcript)
+        system_prompt, user_prompt = get_summarize_prompt(transcript, output_language)
         
         response = self.client.complete_json(
             prompt=user_prompt,
@@ -118,6 +119,7 @@ class VideoSummarizer:
         self,
         transcript: str,
         num_clips: int = 5,
+        output_language: str = "original",
     ) -> tuple[Summary, List[Clip]]:
         """
         Process a transcript to generate both summary and clips.
@@ -125,11 +127,12 @@ class VideoSummarizer:
         Args:
             transcript: The video transcript in SRT format.
             num_clips: Number of clips to extract.
+            output_language: "original" for video language, "english" to translate.
         
         Returns:
             Tuple of (Summary, List[Clip]).
         """
-        summary = self.summarize(transcript)
+        summary = self.summarize(transcript, output_language=output_language)
         clips = self.extract_clips(transcript, num_clips=num_clips)
         
         return summary, clips

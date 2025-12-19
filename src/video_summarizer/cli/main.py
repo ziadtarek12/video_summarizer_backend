@@ -132,7 +132,13 @@ def transcribe(source: str, output: Optional[str], language: Optional[str], mode
     default=None,
     help="LLM model to use. Defaults to config value.",
 )
-def summarize(transcript_path: str, output: Optional[str], provider: Optional[str], model: Optional[str]):
+@click.option(
+    "--output-language", "-L",
+    default="original",
+    type=click.Choice(["original", "english"]),
+    help="Summary output language: 'original' (video language) or 'english'.",
+)
+def summarize(transcript_path: str, output: Optional[str], provider: Optional[str], model: Optional[str], output_language: str):
     """
     Summarize a video transcript.
     
@@ -161,10 +167,10 @@ def summarize(transcript_path: str, output: Optional[str], provider: Optional[st
         output = str(Path(transcript_path).with_name("summary.txt"))
     
     # Summarize
-    click.echo("🤖 Generating summary...")
+    click.echo(f"🤖 Generating summary (language: {output_language})...")
     try:
         summarizer = VideoSummarizer(provider=provider, model=model)
-        summary = summarizer.summarize(transcript_text)
+        summary = summarizer.summarize(transcript_text, output_language=output_language)
     except Exception as e:
         click.echo(f"❌ Summarization failed: {e}", err=True)
         sys.exit(1)
@@ -214,6 +220,11 @@ def summarize(transcript_path: str, output: Optional[str], provider: Optional[st
     default=False,
     help="Re-encode clips for accurate cuts (slower).",
 )
+@click.option(
+    "--merge/--no-merge",
+    default=False,
+    help="Merge all clips into a single video file.",
+)
 def extract_clips_cmd(
     transcript_path: str,
     video: str,
@@ -222,6 +233,7 @@ def extract_clips_cmd(
     provider: Optional[str],
     model: Optional[str],
     reencode: bool,
+    merge: bool,
 ):
     """
     Extract important clips from a video based on its transcript.
@@ -230,7 +242,7 @@ def extract_clips_cmd(
     """
     from video_summarizer.transcription.srt_formatter import load_srt, format_as_srt
     from video_summarizer.llm import VideoSummarizer
-    from video_summarizer.llm.clip_extractor import extract_clips, save_clips_metadata
+    from video_summarizer.llm.clip_extractor import extract_clips, save_clips_metadata, merge_clips
     
     # Validate inputs
     if not Path(transcript_path).exists():
@@ -284,6 +296,16 @@ def extract_clips_cmd(
     )
     
     click.echo(f"✅ Extracted {len(extracted)} clips to: {output_dir}")
+    
+    # Merge clips if requested
+    if merge and extracted:
+        click.echo("🔗 Merging clips into single video...")
+        try:
+            merged_path = str(Path(output_dir) / "merged_clips.mp4")
+            merge_clips(extracted, merged_path, reencode=True)
+            click.echo(f"✅ Merged video saved to: {merged_path}")
+        except Exception as e:
+            click.echo(f"⚠️ Merge failed: {e}", err=True)
 
 
 @cli.command()
@@ -321,9 +343,20 @@ def extract_clips_cmd(
     help="LLM model to use. Defaults to config value.",
 )
 @click.option(
+    "--output-language", "-L",
+    default="original",
+    type=click.Choice(["original", "english"]),
+    help="Summary output language: 'original' or 'english'.",
+)
+@click.option(
     "--reencode/--no-reencode",
     default=False,
     help="Re-encode clips for accurate cuts (slower).",
+)
+@click.option(
+    "--merge/--no-merge",
+    default=False,
+    help="Merge all clips into a single video file.",
 )
 def process(
     source: str,
@@ -333,7 +366,9 @@ def process(
     whisper_model: Optional[str],
     provider: Optional[str],
     llm_model: Optional[str],
+    output_language: str,
     reencode: bool,
+    merge: bool,
 ):
     """
     Process a video through the full pipeline.
@@ -356,7 +391,7 @@ def process(
     )
     from video_summarizer.transcription.srt_formatter import load_srt
     from video_summarizer.llm import VideoSummarizer
-    from video_summarizer.llm.clip_extractor import extract_clips, save_clips_metadata
+    from video_summarizer.llm.clip_extractor import extract_clips, save_clips_metadata, merge_clips
     
     # Determine output directory
     if output_dir is None:
@@ -409,12 +444,12 @@ def process(
     plain_text = "\n".join(seg.text for seg in segments)
     
     # Step 3: Summarize
-    click.echo("\n🤖 Step 3/4: Generating summary...")
+    click.echo(f"\n🤖 Step 3/4: Generating summary (language: {output_language})...")
     summary_path = output_dir / "summary.txt"
     
     try:
         summarizer = VideoSummarizer(provider=provider, model=llm_model)
-        summary = summarizer.summarize(plain_text)
+        summary = summarizer.summarize(plain_text, output_language=output_language)
         
         with open(summary_path, "w", encoding="utf-8") as f:
             f.write(summary.text)
@@ -447,6 +482,17 @@ def process(
         )
         
         click.echo(f"✅ Extracted {len(extracted)} clips")
+        
+        # Merge clips if requested
+        if merge and extracted:
+            click.echo("🔗 Merging clips into single video...")
+            try:
+                merged_path = str(output_dir / "merged_clips.mp4")
+                merge_clips(extracted, merged_path, reencode=True)
+                click.echo(f"✅ Merged video saved to: {merged_path}")
+            except Exception as e:
+                click.echo(f"⚠️ Merge failed: {e}", err=True)
+                
     except Exception as e:
         click.echo(f"❌ Clip extraction failed: {e}", err=True)
         sys.exit(1)
@@ -457,8 +503,90 @@ def process(
     click.echo(f"📄 Transcript: {transcript_path}")
     click.echo(f"📝 Summary: {summary_path}")
     click.echo(f"🎬 Clips: {clips_dir}")
+    if merge and extracted:
+        click.echo(f"🔗 Merged: {output_dir / 'merged_clips.mp4'}")
     click.echo("=" * 50)
+
+
+@cli.command()
+@click.argument("transcript_path")
+@click.option(
+    "--provider", "-p",
+    default=None,
+    type=click.Choice(["google", "openrouter"]),
+    help="LLM provider to use. Defaults to 'google'.",
+)
+@click.option(
+    "--model", "-m",
+    default=None,
+    help="LLM model to use. Defaults to config value.",
+)
+def chat(transcript_path: str, provider: Optional[str], model: Optional[str]):
+    """
+    Chat about a video using its transcript.
+    
+    TRANSCRIPT_PATH should be a path to an SRT file.
+    
+    Enter messages to ask questions about the video content.
+    Type 'quit', 'exit', or 'q' to end the session.
+    Type 'clear' to reset conversation history.
+    """
+    from video_summarizer.transcription.srt_formatter import load_srt
+    from video_summarizer.llm import create_chat_session
+    
+    # Load transcript
+    if not Path(transcript_path).exists():
+        click.echo(f"❌ File not found: {transcript_path}", err=True)
+        sys.exit(1)
+    
+    click.echo(f"📖 Loading transcript: {transcript_path}")
+    
+    try:
+        segments = load_srt(transcript_path)
+        transcript_text = "\n".join(seg.text for seg in segments)
+    except Exception as e:
+        click.echo(f"❌ Failed to load transcript: {e}", err=True)
+        sys.exit(1)
+    
+    # Create chat session
+    click.echo("🤖 Starting chat session...")
+    click.echo("   Type 'quit' to exit, 'clear' to reset history.\n")
+    
+    session = create_chat_session(
+        transcript=transcript_text,
+        provider=provider,
+        model=model,
+    )
+    
+    # Interactive chat loop
+    while True:
+        try:
+            user_input = click.prompt("You", prompt_suffix=": ")
+        except (EOFError, KeyboardInterrupt):
+            click.echo("\n👋 Goodbye!")
+            break
+        
+        # Handle special commands
+        if user_input.lower() in ("quit", "exit", "q"):
+            click.echo("👋 Goodbye!")
+            break
+        
+        if user_input.lower() == "clear":
+            session.clear_history()
+            click.echo("🗑️ Conversation history cleared.\n")
+            continue
+        
+        if not user_input.strip():
+            continue
+        
+        # Get response
+        try:
+            response = session.chat(user_input)
+            click.echo(f"\n🤖 Assistant: {response}\n")
+        except Exception as e:
+            click.echo(f"❌ Error: {e}\n", err=True)
 
 
 if __name__ == "__main__":
     cli()
+
