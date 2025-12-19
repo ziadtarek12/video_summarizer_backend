@@ -118,6 +118,28 @@
           Or upload a video file
         </button>
       </div>
+      <!-- Options -->
+      <div class="mt-4 flex flex-wrap gap-4 justify-center text-sm text-muted">
+        <label class="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+          <input type="checkbox" id="optSummarize"
+            class="rounded bg-surface border-white/10 text-primary focus:ring-primary" checked>
+          <span>Summarize</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+          <input type="checkbox" id="optClips"
+            class="rounded bg-surface border-white/10 text-primary focus:ring-primary" checked>
+          <span>Extract Clips</span>
+        </label>
+        <!-- Chat is implicitly enabled if summary is there, but user asked for choice. Let's add it. 
+                Actually chat depends on transcript. If we don't start it automatically, user can start it manually?
+                The current flow starts it automatically. Let's make it an option. -->
+        <label class="flex items-center gap-2 cursor-pointer hover:text-white transition-colors">
+          <input type="checkbox" id="optChat" class="rounded bg-surface border-white/10 text-primary focus:ring-primary"
+            checked>
+          <span>Start Chat Session</span>
+        </label>
+      </div>
+
       <p id="statusMessage" class="mt-4 text-sm text-muted hidden flex items-center justify-center gap-2">
         <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
         Processing video...
