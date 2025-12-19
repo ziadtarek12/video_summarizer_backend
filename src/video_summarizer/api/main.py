@@ -145,6 +145,8 @@ app.add_middleware(
 )
 
 # Serve static files (for accessing clips/videos if needed)
+if not os.path.exists("output"):
+    os.makedirs("output")
 app.mount("/output", StaticFiles(directory="output"), name="output")
 
 # Models
