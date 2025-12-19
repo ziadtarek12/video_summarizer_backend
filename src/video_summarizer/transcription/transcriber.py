@@ -80,15 +80,41 @@ class WhisperTranscriber:
         try:
             # Determine device
             device = self.device
-            if device == "auto":
-                import torch
-                device = "cuda" if torch.cuda.is_available() else "cpu"
+            compute_type = self.compute_type
             
-            self._model = WhisperModel(
-                self.model_name,
-                device=device,
-                compute_type=self.compute_type,
-            )
+            if device == "auto":
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        device = "cuda"
+                    else:
+                        device = "cpu"
+                        compute_type = "int8"  # Use int8 for CPU
+                except ImportError:
+                    device = "cpu"
+                    compute_type = "int8"
+            
+            # Try to load with selected device
+            try:
+                self._model = WhisperModel(
+                    self.model_name,
+                    device=device,
+                    compute_type=compute_type,
+                )
+            except Exception as cuda_error:
+                # If CUDA fails, fall back to CPU
+                if device == "cuda":
+                    print(f"⚠️ CUDA failed ({cuda_error}), falling back to CPU...")
+                    device = "cpu"
+                    compute_type = "int8"
+                    self._model = WhisperModel(
+                        self.model_name,
+                        device=device,
+                        compute_type=compute_type,
+                    )
+                else:
+                    raise
+                    
         except Exception as e:
             raise TranscriptionError(f"Failed to load Whisper model: {e}") from e
     

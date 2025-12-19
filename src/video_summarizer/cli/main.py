@@ -44,7 +44,13 @@ def cli():
     default=None,
     help="Whisper model to use (e.g., 'large-v3'). Defaults to config value.",
 )
-def transcribe(source: str, output: Optional[str], language: Optional[str], model: Optional[str]):
+@click.option(
+    "--device", "-d",
+    default=None,
+    type=click.Choice(["auto", "cpu", "cuda"]),
+    help="Device to use for transcription. Defaults to 'auto' (tries CUDA, falls back to CPU).",
+)
+def transcribe(source: str, output: Optional[str], language: Optional[str], model: Optional[str], device: Optional[str]):
     """
     Transcribe a video to SRT format.
     
@@ -90,7 +96,7 @@ def transcribe(source: str, output: Optional[str], language: Optional[str], mode
     # Transcribe
     click.echo("📝 Transcribing (this may take a while)...")
     try:
-        transcriber = WhisperTranscriber(model=model, language=language)
+        transcriber = WhisperTranscriber(model=model, language=language, device=device)
         segments = transcriber.transcribe(audio_path)
         click.echo(f"✅ Transcribed {len(segments)} segments")
     except Exception as e:
