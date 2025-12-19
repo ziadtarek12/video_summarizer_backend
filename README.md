@@ -13,6 +13,16 @@ A modular Python CLI tool for transcribing Arabic videos using Whisper Large v3 
 - 🔗 **Clip Merging**: Combine extracted clips into a single video
 - 💬 **Video Chat**: Interactive Q&A about video content with streaming responses
 - 🎥 **Auto-Export**: Export clips as separate video files
+- 💻 **Web Interface**: Integrated modern Web UI for easy interaction
+
+## Web UI
+
+To start the Video Summarizer API with the integrated web interface (auto-installs dependencies if needed):
+
+```bash
+python run_backend.py
+```
+Then open [http://localhost:8000](http://localhost:8000) to use the application.
 
 ## Installation
 

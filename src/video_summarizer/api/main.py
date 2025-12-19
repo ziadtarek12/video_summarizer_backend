@@ -9,6 +9,7 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
@@ -160,10 +161,18 @@ class ProcessRequest(BaseModel):
     merge: bool = True
     provider: str = "google"
 
+# Resolve paths
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent.parent
+frontend_dir = project_root / "frontend"
+
 # Routes
 @app.get("/")
 async def root():
-    return {"message": "Video Summarizer API is running"}
+    return FileResponse(frontend_dir / "index.html")
+
+# Mount frontend assets
+app.mount("/js", StaticFiles(directory=frontend_dir / "js"), name="frontend_js")
 
 @app.get("/api/jobs/{job_id}")
 async def get_job_status(job_id: str):
