@@ -114,6 +114,19 @@ const handleTranscriptionResult = async (transcribeJob) => {
     els.resultsArea.classList.remove('hidden');
     setStatus(null);
 };
+// Render functions
+const renderSummary = (data) => {
+    try {
+        const html = marked.parse(data.text);
+        els.summaryContent.innerHTML = html;
+    } catch (e) {
+        console.error("Markdown parsing failed", e);
+        els.summaryContent.textContent = data.text;
+    }
+
+    // Key points (if available) - typically included in text or separately?
+    // If backend returns keys points separately we can render them too.
+};
 
 // Main Flow
 const processVideo = async () => {
@@ -129,6 +142,11 @@ const processVideo = async () => {
         setStatus('Initializing...');
         addLog(`Initializing request for URL: ${url}`);
         const transcribeJob = await VideoSummarizerAPI.transcribe(url);
+
+        if (transcribeJob.cached) {
+            addLog("Found existing transcription for this video. Using cached results.");
+        }
+
         await handleTranscriptionResult(transcribeJob);
 
         // Setup Video Player (YouTube)
@@ -163,6 +181,11 @@ const processFile = async (e) => {
         setStatus('Uploading file...');
         addLog(`Uploading file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
         const transcribeJob = await VideoSummarizerAPI.transcribeFile(file);
+
+        if (transcribeJob.cached) {
+            addLog("Found existing transcription for this file. Using cached results.");
+        }
+
         await handleTranscriptionResult(transcribeJob);
 
         // Setup Video Player (Local File - strict browser policies might prevent direct play from path)

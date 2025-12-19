@@ -213,6 +213,11 @@ async def transcribe_file(
     model: Optional[str] = Form(None),
     device: Optional[str] = Form("auto")
 ):
+    # Check for existing job with same filename
+    for jid, j in jobs.items():
+        if j.status == JobStatus.COMPLETED and j.files.get("video") and Path(j.files["video"]).name == file.filename:
+            return {"job_id": jid, "status": "completed", "cached": True}
+
     job = create_job("transcribe")
     
     # Create job dir
