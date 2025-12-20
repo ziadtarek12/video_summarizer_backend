@@ -172,25 +172,12 @@ else:
 # Mount 'output' for accessing generated files
 app.mount("/output", StaticFiles(directory="output"), name="output")
 
-# Include Auth Router
-app.include_router(auth.router)
-
-# --- Routes ---
-
-@app.get("/{full_path:path}")
-async def catch_all(full_path: str):
-    # If the request is for an API endpoint that doesn't exist, let it fall through to 404
-    if full_path.startswith("api/"):
-        raise HTTPException(status_code=404, detail="API endpoint not found")
-        
-    index_file = static_dir / "index.html"
-    if index_file.exists():
-        return FileResponse(index_file)
-    return {"message": "Frontend not found. Please run 'npm run build' in frontend/."}
-
 # Mount assets if they exist (Vite structure)
 if (static_dir / "assets").exists():
     app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+
+# Include Auth Router
+app.include_router(auth.router)
 
 # --- API Models ---
 
@@ -362,6 +349,17 @@ def extract_clips_endpoint(request: ExtractClipsRequest):
     # This one is heavy, should be background task really.
     # ... logic similar to previous ...
     return {"message": "Not fully implemented in this refactor yet (Logic exists in previous version but needs porting to new structure)"} 
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    # If the request is for an API endpoint that doesn't exist, let it fall through to 404
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+        
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {"message": "Frontend not found. Please run 'npm run build' in frontend/."}
+
 
 if __name__ == "__main__":
     import uvicorn
