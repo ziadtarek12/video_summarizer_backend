@@ -85,18 +85,7 @@ export function Dashboard() {
             const res = await apiService.getVideoDetails(video.id)
             setSelectedVideo(res.data)
 
-            // If video has transcript, allow direct processing without re-transcription
-            if (res.data.transcript_text) {
-                // Set results from library so user can summarize/chat directly
-                if (setResultsFromLibrary) {
-                    setResultsFromLibrary({
-                        transcript: res.data.transcript_text,
-                        videoPath: res.data.file_path,
-                        videoId: res.data.id,
-                        fromLibrary: true
-                    })
-                }
-            }
+            // Don't automatically set results - let user choose action via buttons
             setShowLibrary(false)
         } catch (e) {
             console.error("Failed to load video details", e)
