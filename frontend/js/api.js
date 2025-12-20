@@ -12,16 +12,40 @@ export class VideoSummarizerAPI {
         return await response.json();
     }
 
-    static async transcribeFile(file) {
-        const formData = new FormData();
-        formData.append('file', file);
+    static async transcribeFile(file, onProgress) {
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append('file', file);
 
-        const response = await fetch(`${API_BASE}/api/transcribe/file`, {
-            method: 'POST',
-            body: formData
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `${API_BASE}/api/transcribe/file`);
+
+            if (onProgress) {
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        onProgress(percentComplete, e.loaded, e.total);
+                    }
+                };
+            }
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        resolve(response);
+                    } catch (e) {
+                        reject(new Error('Invalid JSON response'));
+                    }
+                } else {
+                    reject(new Error(xhr.statusText || 'File transcription request failed'));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error'));
+
+            xhr.send(formData);
         });
-        if (!response.ok) throw new Error('File transcription request failed');
-        return await response.json();
     }
 
     static async getJobStatus(jobId) {

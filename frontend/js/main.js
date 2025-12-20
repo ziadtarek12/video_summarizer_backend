@@ -75,68 +75,7 @@ const formatTime = (seconds) => {
     return new Date(seconds * 1000).toISOString().substr(11, 8);
 };
 
-const handleTranscriptionResult = async (transcribeJob) => {
-    addLog("Transcription job started... polling for status.");
-    const transcribeResult = await VideoSummarizerAPI.pollJob(transcribeJob.job_id, 2000, (step) => {
-        setStatus(step);
-        const lastLog = els.logsArea.querySelector('div').lastElementChild?.textContent;
-        // Basic deduping to avoid spamming the log
-        if (!lastLog || !lastLog.includes(step)) {
-            addLog(step);
-        }
-    });
-    addLog("Transcription completed successfully.");
 
-    state.videoPath = transcribeResult.result.video_path;
-    state.transcriptPath = transcribeResult.result.transcript_path;
-
-    state.transcriptText = "Transcript loaded via backend";
-
-    // 2. Summarize (Condition)
-    if (els.opts.summarize.checked) {
-        setStatus('Generating summary...');
-        addLog("Generating summary...");
-        try {
-            const summarizeJob = await VideoSummarizerAPI.summarize({
-                transcript_path: state.transcriptPath
-            });
-            const summaryResult = await VideoSummarizerAPI.pollJob(summarizeJob.job_id);
-            addLog("Summary generated.");
-            renderSummary(summaryResult.result);
-        } catch (e) {
-            showError("Summarization failed: " + e.message);
-        }
-    } else {
-        addLog("Skipping summary generation (unchecked).");
-    }
-
-    // Start Chat Session (Condition)
-    if (els.opts.chat.checked) {
-        addLog("Starting chat session...");
-        try {
-            const chatSession = await VideoSummarizerAPI.startChat({
-                transcript_path: state.transcriptPath
-            });
-            state.sessionId = chatSession.session_id;
-        } catch (e) {
-            showError("Chat start failed: " + e.message);
-        }
-    } else {
-        addLog("Skipping chat session start (unchecked).");
-    }
-
-    // Extract Clips (Condition)
-    if (els.opts.clips.checked) {
-        addLog("Starting clip extraction (background)...");
-        extractClips();
-    } else {
-        addLog("Skipping clip extraction (unchecked).");
-    }
-
-    // Show Results
-    els.resultsArea.classList.remove('hidden');
-    setStatus(null);
-};
 
 const extractClips = async () => {
     try {
@@ -175,6 +114,7 @@ const processVideo = async () => {
         els.processBtn.disabled = true;
         els.resultsArea.classList.add('hidden');
         clearLogs();
+        resetUI();
 
         // 1. Transcribe
         setStatus('Initializing...');
@@ -214,11 +154,23 @@ const processFile = async (e) => {
         els.uploadBtn.disabled = true;
         els.resultsArea.classList.add('hidden');
         clearLogs();
+        resetUI();
 
         // 1. Upload and Transcribe
         setStatus('Uploading file...');
-        addLog(`Uploading file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-        const transcribeJob = await VideoSummarizerAPI.transcribeFile(file);
+        addLog(`Starting upload: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+
+        const startTime = Date.now();
+        const transcribeJob = await VideoSummarizerAPI.transcribeFile(file, (percent, loaded, total) => {
+            const mbLoaded = (loaded / 1024 / 1024).toFixed(2);
+            const mbTotal = (total / 1024 / 1024).toFixed(2);
+            setStatus(`Uploading... ${Math.round(percent)}% (${mbLoaded} MB / ${mbTotal} MB)`);
+            if (Date.now() - startTime > 1000 && percent % 10 < 1) { // Log occasionally
+                // Optional: Log significant progress points if needed
+            }
+        });
+
+        addLog("Upload complete. Processing...");
 
         if (transcribeJob.cached) {
             addLog("Found existing transcription for this file. Using cached results.");
@@ -226,11 +178,9 @@ const processFile = async (e) => {
 
         await handleTranscriptionResult(transcribeJob);
 
-        // Setup Video Player (Local File - strict browser policies might prevent direct play from path)
-        // Ideally we serve the file via static mount
-        // For now, let's just show a placeholder or try to serve if possible
+        // Setup Video Player for File (Placeholder)
         els.videoPlayer.src = '';
-        // We could mount the output dir and point to it: /output/{jobId}/{filename}
+        els.videoTitle.textContent = file.name;
 
     } catch (e) {
         showError(e.message);
@@ -239,6 +189,119 @@ const processFile = async (e) => {
         // Reset input
         els.videoFileInput.value = '';
     }
+};
+
+const resetUI = () => {
+    // Hide all feature specific tabs initially
+    els.tabs.summary.classList.add('hidden');
+    els.tabs.clips.classList.add('hidden');
+    // Chat sidebar visibility
+    const chatContainer = document.querySelector('.lg\\:col-span-1');
+    if (chatContainer) chatContainer.classList.add('hidden');
+
+    // Reset tab buttons visibility
+    document.querySelector('button[onclick="switchTab(\'summary\')"]').style.display = 'none';
+    document.querySelector('button[onclick="switchTab(\'clips\')"]').style.display = 'none';
+
+    // Transcript is always enabled as base
+    document.querySelector('button[onclick="switchTab(\'transcript\')"]').style.display = 'block';
+    switchTab('transcript');
+};
+
+const handleTranscriptionResult = async (transcribeJob) => {
+    addLog("Transcription job started... polling for status.");
+    const transcribeResult = await VideoSummarizerAPI.pollJob(transcribeJob.job_id, 2000, (step) => {
+        setStatus(step);
+        const lastLog = els.logsArea.querySelector('div').lastElementChild?.textContent;
+        if (!lastLog || !lastLog.includes(step)) {
+            addLog(step);
+        }
+    });
+    addLog("Transcription completed successfully.");
+
+    state.videoPath = transcribeResult.result.video_path;
+    state.transcriptPath = transcribeResult.result.transcript_path;
+    state.transcriptText = "Transcript loaded via backend"; // In a real app we might fetch the text content
+
+    // Transcript is always available
+    const transcriptTabBtn = document.querySelector('button[onclick="switchTab(\'transcript\')"]');
+    transcriptTabBtn.style.display = 'block';
+
+    // Load transcript content (simulated or fetched if implementation allows)
+    // For now we just show a message or if result has it
+    if (transcribeResult.result.transcript_text) {
+        els.transcriptContent.textContent = transcribeResult.result.transcript_text;
+    } else {
+        els.transcriptContent.textContent = "Transcript text available in backend file: " + state.transcriptPath;
+    }
+
+
+    // 2. Summarize (Condition)
+    if (els.opts.summarize.checked) {
+        document.querySelector('button[onclick="switchTab(\'summary\')"]').style.display = 'block';
+        setStatus('Generating summary...');
+        addLog("Generating summary...");
+        try {
+            const summarizeJob = await VideoSummarizerAPI.summarize({
+                transcript_path: state.transcriptPath
+            });
+            const summaryResult = await VideoSummarizerAPI.pollJob(summarizeJob.job_id);
+            addLog("Summary generated.");
+            renderSummary(summaryResult.result);
+            switchTab('summary'); // Switch to summary if generated
+        } catch (e) {
+            showError("Summarization failed: " + e.message);
+        }
+    } else {
+        addLog("Skipping summary generation (unchecked).");
+        document.querySelector('button[onclick="switchTab(\'summary\')"]').style.display = 'none';
+    }
+
+    // Start Chat Session (Condition)
+    const chatContainer = document.querySelector('.lg\\:col-span-1');
+    if (els.opts.chat.checked) {
+        if (chatContainer) {
+            chatContainer.classList.remove('hidden');
+            // Make request columns span only 2 if chat is present
+            document.querySelector('.lg\\:col-span-2').classList.remove('lg:col-span-3');
+            document.querySelector('.lg\\:col-span-2').classList.add('lg:col-span-2');
+        }
+
+        addLog("Starting chat session...");
+        try {
+            const chatSession = await VideoSummarizerAPI.startChat({
+                transcript_path: state.transcriptPath
+            });
+            state.sessionId = chatSession.session_id;
+        } catch (e) {
+            showError("Chat start failed: " + e.message);
+        }
+    } else {
+        addLog("Skipping chat session start (unchecked).");
+        if (chatContainer) {
+            chatContainer.classList.add('hidden');
+            // Expand main content if chat is hidden
+            const mainCol = document.querySelector('.lg\\:col-span-2');
+            if (mainCol) {
+                mainCol.classList.remove('lg:col-span-2');
+                mainCol.classList.add('lg:col-span-3'); // Full width
+            }
+        }
+    }
+
+    // Extract Clips (Condition)
+    if (els.opts.clips.checked) {
+        document.querySelector('button[onclick="switchTab(\'clips\')"]').style.display = 'block';
+        addLog("Starting clip extraction (background)...");
+        extractClips();
+    } else {
+        addLog("Skipping clip extraction (unchecked).");
+        document.querySelector('button[onclick="switchTab(\'clips\')"]').style.display = 'none';
+    }
+
+    // Show Results
+    els.resultsArea.classList.remove('hidden');
+    setStatus(null);
 };
 
 // Event Listeners
