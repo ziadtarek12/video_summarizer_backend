@@ -26,6 +26,10 @@ class Video(Base):
     # Metadata
     thumbnail_url = Column(String, nullable=True)
     source_url = Column(String, nullable=True) # If from YouTube
+    
+    # Transcript data for reuse
+    transcript_text = Column(Text, nullable=True)
+    transcript_path = Column(String, nullable=True)
 
     user_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="videos")

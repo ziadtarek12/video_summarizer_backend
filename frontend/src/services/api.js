@@ -31,6 +31,16 @@ export const apiService = {
         return API.get('/library');
     },
 
+    // App Configuration (languages, models)
+    getConfig: async () => {
+        return API.get('/config');
+    },
+
+    // Get video details for library reuse
+    getVideoDetails: async (videoId) => {
+        return API.get(`/videos/${videoId}`);
+    },
+
     // Transcribe URL
     transcribeUrl: async (url, options) => {
         // options: { device, model, language }

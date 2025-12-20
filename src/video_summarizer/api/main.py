@@ -28,6 +28,7 @@ from video_summarizer.llm.clip_extractor import extract_clips, save_clips_metada
 # DB & Auth Imports
 from video_summarizer.db import models, database, get_db
 from video_summarizer.api import auth
+from video_summarizer.config import get_config, ALLOWED_LANGUAGES
 
 # --- Constants & Helper Classes ---
 
@@ -46,6 +47,10 @@ def process_transcription(job_id: str, source: str, model: str, language: str, d
         job = db.query(models.Job).filter(models.Job.id == job_id).first()
         if not job:
             return
+        
+        # Validate language - only ar and en allowed
+        config = get_config()
+        validated_language = config.whisper.validate_language(language)
         
         # Helper to update job in DB
         def update_job(status, result=None, error=None):
@@ -68,20 +73,21 @@ def process_transcription(job_id: str, source: str, model: str, language: str, d
             # 1. Handle Source (Download or File)
             video_path = source
             title = "Uploaded Video"
+            source_url = None
             
             if is_youtube_url(source):
                 update_job(JobStatus.PROCESSING, {"step": "Downloading video..."})
                 video_info = download_video(source, output_dir=str(output_dir)) 
-                # Note: download_video now returns path, need to fetch metadata separately if we want title
-                video_path = video_info # Assuming it returns path string
-                title = f"YouTube Video {job_id[:8]}" 
-                # Ideally download_video should return a dict or we use get_video_info first
+                video_path = video_info
+                title = f"YouTube Video {job_id[:8]}"
+                source_url = source
                 
             # Create Video Entry in DB
             db_video = models.Video(
                 title=title,
                 filename=Path(video_path).name,
                 file_path=str(video_path),
+                source_url=source_url,
                 user_id=user_id
             )
             db.add(db_video)
@@ -96,9 +102,9 @@ def process_transcription(job_id: str, source: str, model: str, language: str, d
             update_job(JobStatus.PROCESSING, {"step": "Extracting audio..."})
             audio_path = extract_audio(video_path)
                 
-            # 3. Transcribe
-            update_job(JobStatus.PROCESSING, {"step": "Transcribing audio..."})
-            transcriber = WhisperTranscriber(model=model, language=language, device=device)
+            # 3. Transcribe (using large-v3 model enforced in config)
+            update_job(JobStatus.PROCESSING, {"step": f"Transcribing audio ({validated_language})..."})
+            transcriber = WhisperTranscriber(language=validated_language, device=device)
             segments = transcriber.transcribe(audio_path)
             
             # Save SRT
@@ -110,6 +116,11 @@ def process_transcription(job_id: str, source: str, model: str, language: str, d
             plain_text = "\n".join(seg.text for seg in segments)
             with open(text_path, "w", encoding="utf-8") as f:
                 f.write(plain_text)
+            
+            # Update Video with transcript data for library reuse
+            db_video.transcript_text = plain_text
+            db_video.transcript_path = str(text_path)
+            db.commit()
 
             # Cleanup
             if os.path.exists(audio_path):
@@ -119,9 +130,10 @@ def process_transcription(job_id: str, source: str, model: str, language: str, d
                 "message": "Transcription successful",
                 "step": "Completed",
                 "video_path": video_path,
+                "video_id": db_video.id,
                 "transcript_path": str(srt_path),
                 "segments_count": len(segments),
-                "transcript_text": plain_text # Providing text directly for frontend convenience
+                "transcript_text": plain_text
             })
 
         except Exception as e:
@@ -178,6 +190,57 @@ if (static_dir / "assets").exists():
 
 # Include Auth Router
 app.include_router(auth.router)
+
+# --- Config Endpoint ---
+
+@app.get("/api/config")
+def get_app_config():
+    """Return available languages and LLM models for frontend configuration."""
+    config = get_config()
+    return {
+        "languages": ALLOWED_LANGUAGES,
+        "models": config.llm.available_models,
+        "default_language": "ar",
+        "default_model": config.llm.model
+    }
+
+# --- Video Details Endpoint for Library Reuse ---
+
+@app.get("/api/videos/{video_id}")
+def get_video_details(
+    video_id: int,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get video details including transcript for reuse."""
+    video = db.query(models.Video).filter(
+        models.Video.id == video_id,
+        models.Video.user_id == current_user.id
+    ).first()
+    
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    
+    # Try to get transcript from video record or load from file
+    transcript_text = video.transcript_text
+    if not transcript_text and video.transcript_path:
+        try:
+            with open(video.transcript_path, "r", encoding="utf-8") as f:
+                transcript_text = f.read()
+        except:
+            pass
+    
+    return {
+        "id": video.id,
+        "title": video.title,
+        "filename": video.filename,
+        "file_path": video.file_path,
+        "duration": video.duration,
+        "created_at": video.created_at,
+        "source_url": video.source_url,
+        "transcript_text": transcript_text,
+        "transcript_path": video.transcript_path
+    }
 
 # --- API Models ---
 

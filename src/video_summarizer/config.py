@@ -6,22 +6,41 @@ Loads settings from environment variables and provides defaults.
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
+# Allowed languages for transcription (Arabic and English only)
+ALLOWED_LANGUAGES = {
+    "ar": "Arabic",
+    "en": "English"
+}
+
+# Default LLM models if not specified in .env
+DEFAULT_LLM_MODELS = [
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+]
+
 
 @dataclass
 class WhisperConfig:
-    """Configuration for Whisper transcription."""
+    """Configuration for Whisper transcription using faster-whisper large-v3."""
     
-    model: str = field(default_factory=lambda: os.getenv("WHISPER_MODEL", "large-v3"))
+    # Force large-v3 model for best accuracy
+    model: str = "large-v3"
     language: str = field(default_factory=lambda: os.getenv("WHISPER_LANGUAGE", "ar"))
     device: str = field(default_factory=lambda: os.getenv("WHISPER_DEVICE", "auto"))
     compute_type: str = field(default_factory=lambda: os.getenv("WHISPER_COMPUTE_TYPE", "float16"))
+    
+    def validate_language(self, lang: str) -> str:
+        """Validate and return language code. Defaults to 'ar' if invalid."""
+        if lang and lang.lower() in ALLOWED_LANGUAGES:
+            return lang.lower()
+        return "ar"  # Default to Arabic
 
 
 @dataclass
@@ -57,6 +76,14 @@ class LLMConfig:
         if self.provider == "google":
             return self.google_model
         return self.openrouter_model
+    
+    @property
+    def available_models(self) -> List[str]:
+        """Get list of available LLM models from environment."""
+        models_str = os.getenv("AVAILABLE_LLM_MODELS", "")
+        if models_str:
+            return [m.strip() for m in models_str.split(",") if m.strip()]
+        return DEFAULT_LLM_MODELS
 
 
 @dataclass

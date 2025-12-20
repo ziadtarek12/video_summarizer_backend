@@ -30,6 +30,19 @@ export function useVideoProcessing() {
         setError(null)
     }
 
+    // Set results directly from library video (allows reprocessing without re-transcription)
+    const setResultsFromLibrary = (libraryData) => {
+        reset()
+        setResults({
+            transcript: libraryData.transcript,
+            videoPath: libraryData.videoPath,
+            videoId: libraryData.videoId,
+            fromLibrary: true
+        })
+        addLog(`Loaded video from library (ID: ${libraryData.videoId})`, 'success')
+        setStatus('completed')
+    }
+
     const toggleFeature = (featureId) => {
         setFeatures(prev => ({
             ...prev,
@@ -125,6 +138,7 @@ export function useVideoProcessing() {
         features,
         toggleFeature,
         processVideo,
-        reset
+        reset,
+        setResultsFromLibrary
     }
 }
