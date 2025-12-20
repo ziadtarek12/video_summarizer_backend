@@ -43,7 +43,7 @@ def download_video(
     url: str,
     output_dir: Optional[str] = None,
     filename: Optional[str] = None,
-    format_preference: str = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+    format_preference: str = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
 ) -> str:
     """
     Download a video from YouTube.
@@ -93,6 +93,7 @@ def download_video(
         "format": format_preference,
         "outtmpl": output_template,
         "merge_output_format": "mp4",
+        "format_sort": ["res:1080", "ext:mp4:m4a"],
     })
 
     try:
