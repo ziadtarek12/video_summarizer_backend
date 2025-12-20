@@ -167,15 +167,33 @@ class ProcessRequest(BaseModel):
 # Resolve paths
 current_file = Path(__file__).resolve()
 project_root = current_file.parent.parent.parent.parent
-frontend_dir = project_root / "frontend"
+
+# Check for production build first, then fallback to dev folder
+frontend_dist = project_root / "frontend" / "dist"
+frontend_legacy = project_root / "frontend_legacy"
+frontend_src = project_root / "frontend"
+
+if frontend_dist.exists():
+    static_dir = frontend_dist
+    print(f"✨ Serving production frontend from: {static_dir}")
+else:
+    static_dir = frontend_src
+    print(f"⚠️  Production build not found. Serving from: {static_dir}")
 
 # Routes
 @app.get("/")
 async def root():
-    return FileResponse(frontend_dir / "index.html")
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {"message": "Frontend not found. Please run 'npm run build' in the frontend directory."}
 
-# Mount frontend assets
-app.mount("/js", StaticFiles(directory=frontend_dir / "js"), name="frontend_js")
+# Mount static assets
+if (static_dir / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+elif (static_dir / "js").exists():
+    # Fallback for legacy or custom structures
+    app.mount("/js", StaticFiles(directory=static_dir / "js"), name="js")
 
 @app.get("/api/jobs/{job_id}")
 async def get_job_status(job_id: str):

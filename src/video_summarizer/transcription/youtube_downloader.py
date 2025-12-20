@@ -127,6 +127,8 @@ def download_video(
         raise YouTubeDownloadError(f"Unexpected error during download: {e}") from e
 
 
+from video_summarizer.config import get_config
+
 def _get_base_ydl_opts() -> dict:
     """
     Get base yt-dlp options with authentication configuration.
@@ -134,6 +136,8 @@ def _get_base_ydl_opts() -> dict:
     Returns:
         Dictionary of yt-dlp options.
     """
+    config = get_config()
+    
     # Search for cookies.txt in likely locations
     possible_paths = [
         Path(os.getcwd()) / "cookies.txt",
@@ -159,6 +163,11 @@ def _get_base_ydl_opts() -> dict:
             }
         }
     }
+    
+    # Add proxy if configured
+    if config.downloader.proxy:
+        print(f"🌐 Using Proxy: {config.downloader.proxy}")
+        ydl_opts["proxy"] = config.downloader.proxy
     
     # Add authentication configuration
     if cookies_path:

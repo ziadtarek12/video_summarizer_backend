@@ -68,12 +68,20 @@ class OutputConfig:
 
 
 @dataclass
+class DownloaderConfig:
+    """Configuration for video downloader (yt-dlp)."""
+    
+    proxy: Optional[str] = field(default_factory=lambda: os.getenv("YOUTUBE_PROXY", os.getenv("HTTP_PROXY")))
+
+
+@dataclass
 class Config:
     """Main configuration class combining all settings."""
     
     whisper: WhisperConfig = field(default_factory=WhisperConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
+    downloader: DownloaderConfig = field(default_factory=DownloaderConfig)
     
     def validate(self) -> list[str]:
         """Validate the configuration and return list of errors."""

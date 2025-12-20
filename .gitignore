@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.env
+
+# Frontend / Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+.eslintcache
+
+# Logs and databases
+*.log
+*.sqlite
+
+# IDEs
+.vscode/
+.idea/
+
+# Project specifics
+output/
+frontend_legacy/
+cookies.txt
+*.srt
+*.mp4
+*.m4a
+*.webm
+*.mkv
+temp/
