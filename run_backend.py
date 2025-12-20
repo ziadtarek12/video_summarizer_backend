@@ -18,8 +18,12 @@ def install_package():
     except subprocess.CalledProcessError as e:
         print(f"❌ Installation failed: {e}")
         sys.exit(1)
-
 def start_server(port: int = 8000):
+    env = os.environ.copy()
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    src_path = os.path.join(project_root, "src")
+    env["PYTHONPATH"] = src_path + os.pathsep + env.get("PYTHONPATH", "")
+    
     print(f"🚀 Starting Video Summarizer Backend on port {port}...")
     try:
         subprocess.check_call([
@@ -27,8 +31,9 @@ def start_server(port: int = 8000):
             "video_summarizer.api.main:app", 
             "--host", "0.0.0.0",
             "--port", str(port),
-            "--reload"
-        ])
+            "--reload",
+            "--reload-dir", src_path
+        ], env=env)
     except KeyboardInterrupt:
         print("\n👋 Server stopped.")
     except subprocess.CalledProcessError as e:

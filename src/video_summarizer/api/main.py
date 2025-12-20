@@ -135,6 +135,9 @@ def process_transcription(job_id: str, source: str, model: str, language: str, d
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("🚀 VIDEO SUMMARIZER v0.2.0 STARTING")
+    print(f"📁 PROJECT ROOT: {project_root}")
+    print(f"🌐 SERVING FRONTEND FROM: {static_dir}")
     # Create Tables
     models.Base.metadata.create_all(bind=database.engine)
     # Ensure output dir
