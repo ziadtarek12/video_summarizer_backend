@@ -177,8 +177,12 @@ app.include_router(auth.router)
 
 # --- Routes ---
 
-@app.get("/")
-async def root():
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    # If the request is for an API endpoint that doesn't exist, let it fall through to 404
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+        
     index_file = static_dir / "index.html"
     if index_file.exists():
         return FileResponse(index_file)
