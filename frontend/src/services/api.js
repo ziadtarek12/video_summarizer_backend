@@ -4,13 +4,37 @@ const API = axios.create({
     baseURL: '/api'
 })
 
+// Request interceptor to add token
+API.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
 export const apiService = {
+    // Auth
+    login: async (email, password) => {
+        const formData = new FormData();
+        formData.append('username', email); // OAuth2 expects 'username'
+        formData.append('password', password);
+        return API.post('/auth/token', formData);
+    },
+    register: async (email, password) => {
+        return API.post('/auth/register', { email, password });
+    },
+    getMe: async () => {
+        return API.get('/auth/me');
+    },
+    getLibrary: async () => {
+        return API.get('/library');
+    },
+
     // Transcribe URL
     transcribeUrl: async (url, options) => {
         // options: { device, model, language }
-        return API.post('/transcribe/url', null, {
-            params: { url, ...options }
-        })
+        return API.post('/transcribe/url', { url, ...options });
     },
 
     // Transcribe File with upload progress
@@ -18,9 +42,12 @@ export const apiService = {
         const formData = new FormData()
         formData.append('file', file)
 
-        // Add other options to query params if needed or strictly follow backend
+        // Append options to formData
+        if (options.language) formData.append('language', options.language);
+        if (options.model) formData.append('model', options.model);
+        if (options.device) formData.append('device', options.device);
+
         return API.post('/transcribe/file', formData, {
-            params: options,
             onUploadProgress: (progressEvent) => {
                 const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
                 if (onProgress) {
@@ -40,27 +67,31 @@ export const apiService = {
 
     summarize: async (transcriptText, options) => {
         // options: { provider, model, output_language }
-        // Backend expects 'transcript' text in body
         return API.post('/summarize', {
             transcript_text: transcriptText,
-        }, { params: options })
+            ...options
+        })
     },
 
-    extractClips: async (transcriptSrt, videoPath, options) => {
+    extractClips: async (transcriptPath, videoPath, options) => {
         // options: { num_clips, provider, model }
         return API.post('/extract-clips', {
-            transcript: transcriptSrt,
-            video_path: videoPath
-        }, { params: options })
+            transcript_path: transcriptPath,
+            video_path: videoPath,
+            ...options
+        })
     },
 
-    startChat: async (transcript) => {
-        return API.post('/chat/start', { transcript })
+    startChat: async (transcriptText) => {
+        return API.post('/chat/start', { transcript_text: transcriptText })
     },
 
     sendChatMessage: async (sessionId, message) => {
-        return API.post(`/chat/${sessionId}/message`, { message }, {
-            responseType: 'stream' // Note: Handling streams in axios is tricky, fetch might be better for this specifically
+        return API.post('/chat/message', {
+            session_id: sessionId,
+            message: message
+        }, {
+            responseType: 'stream'
         })
     }
 }

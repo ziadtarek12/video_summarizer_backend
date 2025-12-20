@@ -37,7 +37,7 @@ export function useVideoProcessing() {
         }))
     }
 
-    const processVideo = async (input, inputType = 'file') => {
+    const processVideo = async (input, inputType = 'file', settings = {}) => {
         reset()
         setStatus('uploading')
         addLog('Starting video processing pipeline...', 'info')
@@ -45,21 +45,24 @@ export function useVideoProcessing() {
         try {
             let transcriptionResult
 
+            const commonOptions = {
+                language: null, // Auto-detect
+                model: 'base', // Whisper model
+                device: 'auto'
+            }
+
             // 1. Transcribe (and upload if file)
             if (inputType === 'file') {
                 addLog(`Uploading file: ${input.name} (${(input.size / (1024 * 1024)).toFixed(2)} MB)`, 'loading')
 
-                const response = await apiService.transcribeFile(input, {}, (progressEvent) => {
+                const response = await apiService.transcribeFile(input, commonOptions, (progressEvent) => {
                     setProgress(progressEvent.percent)
-                    if (progressEvent.percent % 10 === 0 && progressEvent.percent < 100) {
-                        // Throttle logs slightly
-                    }
                 })
                 transcriptionResult = response.data
                 addLog('Upload completed.', 'success')
             } else {
                 addLog(`Processing YouTube URL: ${input}`, 'loading')
-                const response = await apiService.transcribeUrl(input)
+                const response = await apiService.transcribeUrl(input, commonOptions)
                 transcriptionResult = response.data
             }
 
@@ -69,37 +72,33 @@ export function useVideoProcessing() {
 
             const job = await pollJob(transcriptionResult.job_id, (jobStatus) => {
                 if (jobStatus.status === 'processing') {
-                    // Maybe update generic progress or just log
+                    // 
                 }
             })
 
             addLog('Transcription completed successfully.', 'success')
-            const transcriptFile = job.result_files?.transcript
-            const videoPath = job.result_files?.video_path // Need backend to return this likely
 
-            // Store initial results
+            // Store initial results with full job data
             const currentResults = {
-                transcript: job.result, // or fetch srt content
+                transcript: job.result.transcript_text, // Updated backend returns plain text here
                 jobId: job.id,
-                videoPath: videoPath
+                videoPath: job.result.video_path
             }
 
             // 3. Process Optional Features
             setStatus('processing_features')
 
             if (features.summarize) {
-                addLog('Generating AI Summary...', 'loading')
+                addLog(`Generating Summary (${settings.outputLanguage})...`, 'loading')
                 try {
-                    const summaryRes = await apiService.summarize(null, {
-                        // Logic to fetch transcript content first or pass path if backend supports it
+                    // Pass full settings including model and language
+                    const summaryRes = await apiService.summarize(currentResults.transcript, {
+                        output_language: settings.outputLanguage,
+                        model: settings.model,
+                        provider: settings.model.includes('google') ? 'google' : 'openrouter'
                     })
-                    // Wait, backend summarize endpoint needs transcript TEXT. 
-                    // We probably need to fetch the SR/Text first or update backend to accept job_id.
-                    // For now let's assume we need text.
-
-                    // Actually, let's just mark it as "Ready to Summarize" in UI or 
-                    // do it here if we had the text.
-                    // Since this is a rewrite, let's assume we get the transcript text in the job result or fetch it.
+                    addLog('Summary generated.', 'success')
+                    currentResults.summary = summaryRes.data
                 } catch (e) {
                     addLog(`Summarization failed: ${e.message}`, 'error')
                 }
