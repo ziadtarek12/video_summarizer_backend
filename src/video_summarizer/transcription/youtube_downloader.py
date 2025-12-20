@@ -85,32 +85,16 @@ def download_video(
     else:
         output_template = str(output_dir / "%(title)s.%(ext)s")
     
-    # Look for cookies.txt in project root
-    cookies_path = Path("/teamspace/studios/this_studio/video_summarizer_backend/cookies.txt")
+    # Get base options with authentication (browser/cookies file)
+    ydl_opts = _get_base_ydl_opts()
     
-    ydl_opts = {
+    # Add download-specific options
+    ydl_opts.update({
         "format": format_preference,
         "outtmpl": output_template,
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": False,
         "merge_output_format": "mp4",
-        "nocheckcertificate": True,
-        "ignoreerrors": True,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "ios"]
-            }
-        }
-    }
+    })
 
-    if cookies_path.exists():
-        print(f"🍪 Found cookies at: {cookies_path}")
-        ydl_opts["cookiefile"] = str(cookies_path)
-    else:
-        print(f"⚠️ No cookies.txt found. Looked at: {cookies_path}")
-        print(f"   Current Working Directory: {os.getcwd()}")
-    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -142,6 +126,53 @@ def download_video(
         raise YouTubeDownloadError(f"Unexpected error during download: {e}") from e
 
 
+def _get_base_ydl_opts() -> dict:
+    """
+    Get base yt-dlp options with authentication configuration.
+    
+    Returns:
+        Dictionary of yt-dlp options.
+    """
+    # Search for cookies.txt in likely locations
+    possible_paths = [
+        Path(os.getcwd()) / "cookies.txt",
+        Path(__file__).parents[3] / "cookies.txt", # src/video_summarizer -> root
+        Path("/teamspace/studios/this_studio/video_summarizer_backend/cookies.txt") # Absolute fallback
+    ]
+    
+    cookies_path = None
+    for path in possible_paths:
+        if path.exists():
+            cookies_path = path
+            break
+            
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": False,
+        "nocheckcertificate": True,
+        "ignoreerrors": True,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "ios"]
+            }
+        }
+    }
+    
+    # Add authentication configuration
+    if cookies_path:
+        print(f"🍪 Found cookies at: {cookies_path}")
+        ydl_opts["cookiefile"] = str(cookies_path)
+    else:
+        print("⚠️  No cookies.txt found!")
+        print("   If you are running on a server/online machine, you MUST:")
+        print("   1. Export cookies from your local browser (use 'Get cookies.txt LOCALLY' extension)")
+        print(f"   2. Upload the file to: {os.getcwd()}/cookies.txt")
+        print("   Attempting to download without auth (may fail for age-gated/premium content)...")
+        
+    return ydl_opts
+
+
 def get_video_info(url: str) -> dict:
     """
     Get information about a YouTube video without downloading.
@@ -162,11 +193,7 @@ def get_video_info(url: str) -> dict:
             "yt-dlp is not installed. Install it with: pip install yt-dlp"
         )
     
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": False,
-    }
+    ydl_opts = _get_base_ydl_opts()
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
