@@ -240,7 +240,7 @@ export function Dashboard() {
                         )}
 
                         {/* Action Buttons for Library Video */}
-                        {selectedVideo && selectedVideo.transcript_text && !results && (
+                        {selectedVideo && selectedVideo.transcript_text && (
                             <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
