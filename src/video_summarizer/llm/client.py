@@ -362,33 +362,35 @@ def _parse_json_response(response: str) -> dict:
 
 def _try_fix_incomplete_json(json_str: str) -> str:
     """Try to fix incomplete JSON by closing brackets and quotes."""
-    # Count brackets and braces
-    open_braces = json_str.count('{') - json_str.count('}')
-    open_brackets = json_str.count('[') - json_str.count(']')
-    
-    # Check for unclosed strings (odd number of unescaped quotes after last complete value)
-    # Simple heuristic: if ends with a letter/number without trailing quote or comma
     fixed = json_str.rstrip()
     
-    # If string seems cut off mid-value, try to close it
-    if fixed and fixed[-1] not in '",}]':
-        # Check if we're in a string value
-        if '"summary":' in fixed or '"key_points":' in fixed:
-            # Find the last quote
-            last_quote = fixed.rfind('"')
-            last_colon = fixed.rfind(':')
-            if last_colon > last_quote:
-                # We're probably in an unquoted value, add closing quote
-                fixed += '"'
-            elif fixed.count('"') % 2 == 1:
-                # Odd number of quotes, close the string
-                fixed += '"'
+    # If the response was cut off mid-object (e.g., "importa" instead of "importance": 8)
+    # Try to find the last complete object in an array
+    if '"clips":' in fixed or '"key_points":' in fixed:
+        # Try to find the last complete object/element
+        # Look for the last properly closed object
+        last_complete = fixed.rfind('},')
+        if last_complete == -1:
+            last_complete = fixed.rfind('"},')  # For arrays of strings
+        
+        if last_complete > 0:
+            # Truncate to last complete object and close the array/object
+            fixed = fixed[:last_complete + 1]  # Include the }
     
-    # Close array if in key_points
-    if '"key_points"' in fixed and open_brackets > 0:
+    # Count unclosed brackets and braces
+    open_braces = fixed.count('{') - fixed.count('}')
+    open_brackets = fixed.count('[') - fixed.count(']')
+    
+    # If we're in the middle of a string value, close it
+    if fixed and fixed[-1] not in '",}]':
+        # Check if odd number of quotes (unclosed string)
+        if fixed.count('"') % 2 == 1:
+            fixed += '"'
+    
+    # Close brackets first (inner), then braces (outer)
+    if open_brackets > 0:
         fixed += ']' * open_brackets
     
-    # Close braces
     if open_braces > 0:
         fixed += '}' * open_braces
     

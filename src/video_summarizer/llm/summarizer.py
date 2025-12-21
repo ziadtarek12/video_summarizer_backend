@@ -85,6 +85,7 @@ class VideoSummarizer:
         response = self.client.complete_json(
             prompt=user_prompt,
             system=system_prompt,
+            max_tokens=4000,  # Clips need more tokens for multiple descriptions
         )
         
         clips = []
