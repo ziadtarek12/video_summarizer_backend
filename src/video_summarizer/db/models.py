@@ -30,6 +30,14 @@ class Video(Base):
     # Transcript data for reuse
     transcript_text = Column(Text, nullable=True)
     transcript_path = Column(String, nullable=True)
+    
+    # Summary data for reuse (persist after summarization)
+    summary_text = Column(Text, nullable=True)
+    summary_key_points = Column(JSON, nullable=True)  # List of key points
+    
+    # Clips data for reuse (persist after extraction)
+    clips_data = Column(JSON, nullable=True)  # List of clip metadata
+    clips_paths = Column(JSON, nullable=True)  # List of extracted clip file paths
 
     user_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="videos")

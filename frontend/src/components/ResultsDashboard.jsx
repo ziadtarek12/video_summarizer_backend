@@ -140,7 +140,14 @@ export function ResultsDashboard({ results, activeFeatures }) {
 
                 {activeTab === 'clips' && (
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-white">Extracted Clips</h3>
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-white">Extracted Clips</h3>
+                            {results?.clips?.extracted_files?.length > 0 && (
+                                <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">
+                                    {results.clips.extracted_files.length} files ready
+                                </span>
+                            )}
+                        </div>
 
                         {results?.clips?.clips && results.clips.clips.length > 0 ? (
                             <div className="space-y-3">
@@ -167,9 +174,40 @@ export function ResultsDashboard({ results, activeFeatures }) {
                                                     </span>
                                                 </div>
                                             </div>
+                                            {/* Download button if file available */}
+                                            {results?.clips?.extracted_files?.[index] && (
+                                                <a
+                                                    href={`/api/clips/download?path=${encodeURIComponent(results.clips.extracted_files[index])}`}
+                                                    className="flex items-center space-x-1 px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/30 transition-colors text-emerald-400 text-sm"
+                                                    download
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                    <span>Download</span>
+                                                </a>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
+
+                                {/* Download All Section */}
+                                {results?.clips?.extracted_files?.length > 0 && (
+                                    <div className="border-t border-slate-700/50 pt-4 mt-4">
+                                        <h4 className="text-sm font-semibold text-slate-400 mb-3">Extracted Video Files</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {results.clips.extracted_files.map((filePath, idx) => (
+                                                <a
+                                                    key={idx}
+                                                    href={`/api/clips/download?path=${encodeURIComponent(filePath)}`}
+                                                    className="flex items-center space-x-2 px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-700/50 transition-colors text-slate-300 text-sm"
+                                                    download
+                                                >
+                                                    <Download className="w-4 h-4 text-emerald-400" />
+                                                    <span>Clip {idx + 1}</span>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {results.clips.message && (
                                     <p className="text-sm text-slate-500 text-center mt-4">{results.clips.message}</p>

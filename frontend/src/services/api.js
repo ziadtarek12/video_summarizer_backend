@@ -76,7 +76,7 @@ export const apiService = {
     },
 
     summarize: async (transcriptText, options) => {
-        // options: { provider, model, output_language }
+        // options: { provider, model, output_language, video_id }
         return API.post('/summarize', {
             transcript_text: transcriptText,
             ...options
@@ -84,12 +84,17 @@ export const apiService = {
     },
 
     extractClips: async (transcriptText, videoPath, options) => {
-        // options: { num_clips, provider, model, merge }
+        // options: { num_clips, provider, model, merge, video_id }
         return API.post('/extract-clips', {
             transcript_text: transcriptText,
             video_path: videoPath,
             ...options
         })
+    },
+
+    // Get download URL for a clip file
+    getClipDownloadUrl: (clipPath) => {
+        return `/api/clips/download?path=${encodeURIComponent(clipPath)}`
     },
 
     startChat: async (transcriptText, options = {}) => {

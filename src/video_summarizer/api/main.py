@@ -212,7 +212,7 @@ def get_video_details(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get video details including transcript for reuse."""
+    """Get video details including transcript, summary, and clips for reuse."""
     video = db.query(models.Video).filter(
         models.Video.id == video_id,
         models.Video.user_id == current_user.id
@@ -239,7 +239,16 @@ def get_video_details(
         "created_at": video.created_at,
         "source_url": video.source_url,
         "transcript_text": transcript_text,
-        "transcript_path": video.transcript_path
+        "transcript_path": video.transcript_path,
+        # Include cached summary and clips
+        "summary": {
+            "text": video.summary_text,
+            "key_points": video.summary_key_points
+        } if video.summary_text else None,
+        "clips": {
+            "clips": video.clips_data,
+            "extracted_files": video.clips_paths
+        } if video.clips_data else None
     }
 
 # --- API Models ---
@@ -253,6 +262,7 @@ class TranscribeRequest(BaseModel):
 class SummarizeRequest(BaseModel):
     transcript_text: Optional[str] = None # Prefer passing text directly now
     transcript_path: Optional[str] = None
+    video_id: Optional[int] = None  # If provided, save summary to video record
     output_language: str = "english"
     provider: str = "google"
     model: Optional[str] = None
@@ -271,6 +281,7 @@ class ExtractClipsRequest(BaseModel):
     transcript_path: Optional[str] = None
     transcript_text: Optional[str] = None  # Allow passing text directly
     video_path: str
+    video_id: Optional[int] = None  # If provided, save clips to video record
     num_clips: int = 5
     merge: bool = True
     provider: str = "google"
@@ -357,8 +368,11 @@ def transcribe_file(
 # For this iteration, we keep them simple, but they should really be Jobs too.
 
 @app.post("/api/summarize")
-def summarize_endpoint(request: SummarizeRequest):
-    """Generate a summary from transcript text."""
+def summarize_endpoint(
+    request: SummarizeRequest,
+    db: Session = Depends(get_db)
+):
+    """Generate a summary from transcript text and optionally save to video record."""
     try:
         text = request.transcript_text
         if not text and request.transcript_path:
@@ -370,10 +384,19 @@ def summarize_endpoint(request: SummarizeRequest):
              raise HTTPException(status_code=400, detail="Transcript text required")
 
         print(f"[Summarize] Provider: {request.provider}, Model: {request.model}, Language: {request.output_language}")
-        print(f"[Summarize] Transcript length: {len(text)} chars")
+        print(f"[Summarize] Transcript length: {len(text)} chars, Video ID: {request.video_id}")
         
         summarizer = VideoSummarizer(provider=request.provider, model=request.model)
         summary = summarizer.summarize(text, output_language=request.output_language)
+        
+        # Persist to database if video_id provided
+        if request.video_id:
+            video = db.query(models.Video).filter(models.Video.id == request.video_id).first()
+            if video:
+                video.summary_text = summary.text
+                video.summary_key_points = summary.key_points
+                db.commit()
+                print(f"[Summarize] Saved summary to video {request.video_id}")
         
         return {
             "text": summary.text,
@@ -425,8 +448,11 @@ def chat_message(request: ChatMessageRequest):
     return StreamingResponse(generate(), media_type="text/plain")
 
 @app.post("/api/extract-clips")
-def extract_clips_endpoint(request: ExtractClipsRequest):
-    """Extract important clips from a video based on transcript."""
+def extract_clips_endpoint(
+    request: ExtractClipsRequest,
+    db: Session = Depends(get_db)
+):
+    """Extract important clips from a video based on transcript and optionally save to video record."""
     try:
         # Get transcript text
         text = request.transcript_text
@@ -442,7 +468,7 @@ def extract_clips_endpoint(request: ExtractClipsRequest):
             raise HTTPException(status_code=400, detail=f"Video file not found: {request.video_path}")
         
         print(f"[Extract Clips] Provider: {request.provider}, Model: {request.model}, Num clips: {request.num_clips}")
-        print(f"[Extract Clips] Transcript length: {len(text)} chars, Video: {request.video_path}")
+        print(f"[Extract Clips] Transcript length: {len(text)} chars, Video: {request.video_path}, Video ID: {request.video_id}")
         
         # Use VideoSummarizer to extract clips
         summarizer = VideoSummarizer(provider=request.provider, model=request.model)
@@ -466,10 +492,19 @@ def extract_clips_endpoint(request: ExtractClipsRequest):
                 # Merge if requested
                 if request.merge and len(extracted) > 1:
                     merged_path = merge_clips(extracted, str(output_dir / "merged.mp4"))
-                    output_clips.append({"type": "merged", "path": merged_path})
+                    output_clips.append(merged_path)
             except Exception as e:
                 # If extraction fails, just return clip metadata
                 print(f"Clip extraction failed: {e}")
+        
+        # Persist to database if video_id provided
+        if request.video_id:
+            video = db.query(models.Video).filter(models.Video.id == request.video_id).first()
+            if video:
+                video.clips_data = clips_data
+                video.clips_paths = output_clips
+                db.commit()
+                print(f"[Extract Clips] Saved {len(clips_data)} clips to video {request.video_id}")
         
         return {
             "clips": clips_data,
@@ -482,6 +517,24 @@ def extract_clips_endpoint(request: ExtractClipsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/api/clips/download")
+def download_clip(path: str):
+    """Download a clip file."""
+    # Security check - only allow files from output directory
+    if not path.startswith("output/"):
+        raise HTTPException(status_code=400, detail="Invalid clip path")
+    
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Clip file not found")
+    
+    filename = os.path.basename(path)
+    return FileResponse(
+        path,
+        media_type="video/mp4",
+        filename=filename,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 @app.get("/{full_path:path}")
 async def catch_all(full_path: str):

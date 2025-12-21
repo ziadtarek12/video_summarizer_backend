@@ -87,7 +87,17 @@ export function Dashboard() {
             const res = await apiService.getVideoDetails(video.id)
             setSelectedVideo(res.data)
 
-            // Don't automatically set results - let user choose action via buttons
+            // If video has cached summary or clips, set them as results
+            if (res.data.summary || res.data.clips) {
+                setResultsFromLibrary({
+                    transcript: res.data.transcript_text,
+                    videoPath: res.data.file_path,
+                    videoId: res.data.id,
+                    summary: res.data.summary,
+                    clips: res.data.clips
+                })
+            }
+
             setShowLibrary(false)
         } catch (e) {
             console.error("Failed to load video details", e)
@@ -261,7 +271,8 @@ export function Dashboard() {
                                                 const res = await apiService.summarize(selectedVideo.transcript_text, {
                                                     output_language: settings.outputLanguage,
                                                     model: settings.model,
-                                                    provider: settings.provider
+                                                    provider: settings.provider,
+                                                    video_id: selectedVideo.id  // Persist to database
                                                 })
                                                 setResultsFromLibrary({
                                                     transcript: selectedVideo.transcript_text,
@@ -338,7 +349,8 @@ export function Dashboard() {
                                                         num_clips: 5,
                                                         model: settings.model,
                                                         provider: settings.provider,
-                                                        merge: settings.mergeClips
+                                                        merge: settings.mergeClips,
+                                                        video_id: selectedVideo.id  // Persist to database
                                                     }
                                                 )
                                                 setResultsFromLibrary({
