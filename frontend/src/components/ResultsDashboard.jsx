@@ -1,18 +1,25 @@
 import React, { useState } from 'react'
 import clsx from 'clsx'
-import { FileText, Sparkles, Scissors, MessageSquare, Copy, Check, Download } from 'lucide-react'
+import { FileText, Sparkles, Scissors, MessageSquare, Copy, Check, Download, Clock, Star } from 'lucide-react'
 import { ChatInterface } from './ChatInterface'
 
 export function ResultsDashboard({ results, activeFeatures }) {
     const [activeTab, setActiveTab] = useState('transcript')
     const [copied, setCopied] = useState(false)
 
+    // Show tabs based on both features AND available results
     const tabs = [
-        { id: 'transcript', label: 'Transcript', icon: FileText },
-        { id: 'summary', label: 'Summary', icon: Sparkles, disabled: !activeFeatures.summarize },
-        { id: 'clips', label: 'Clips', icon: Scissors, disabled: !activeFeatures.clips },
-        { id: 'chat', label: 'AI Chat', icon: MessageSquare, disabled: !activeFeatures.chat },
+        { id: 'transcript', label: 'Transcript', icon: FileText, available: !!results?.transcript },
+        { id: 'summary', label: 'Summary', icon: Sparkles, available: activeFeatures.summarize || !!results?.summary },
+        { id: 'clips', label: 'Clips', icon: Scissors, available: activeFeatures.clips || !!results?.clips },
+        { id: 'chat', label: 'AI Chat', icon: MessageSquare, available: activeFeatures.chat || !!results?.chatSessionId },
     ]
+
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60)
+        const secs = Math.floor(seconds % 60)
+        return `${mins}:${secs.toString().padStart(2, '0')}`
+    }
 
     const handleCopy = async (text) => {
         await navigator.clipboard.writeText(text)
@@ -25,7 +32,7 @@ export function ResultsDashboard({ results, activeFeatures }) {
             {/* Tabs */}
             <div className="flex border-b border-slate-800/50 bg-slate-950/50">
                 {tabs.map((tab) => (
-                    !tab.disabled && (
+                    tab.available && (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
@@ -128,14 +135,53 @@ export function ResultsDashboard({ results, activeFeatures }) {
                 )}
 
                 {activeTab === 'chat' && (
-                    <ChatInterface transcript={results?.transcript} />
+                    <ChatInterface transcript={results?.transcript} sessionId={results?.chatSessionId} />
                 )}
 
                 {activeTab === 'clips' && (
-                    <div className="text-center py-12 text-slate-500">
-                        <Scissors className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                        <p>Clip extraction results will appear here.</p>
-                        <p className="text-sm mt-1">Enable "Extract Clips" feature to find key moments.</p>
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-white">Extracted Clips</h3>
+
+                        {results?.clips?.clips && results.clips.clips.length > 0 ? (
+                            <div className="space-y-3">
+                                {results.clips.clips.map((clip, index) => (
+                                    <div
+                                        key={index}
+                                        className="bg-gradient-to-br from-rose-500/10 to-pink-500/10 border border-rose-500/20 rounded-xl p-4"
+                                    >
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-white mb-1">{clip.title}</h4>
+                                                <p className="text-sm text-slate-400 mb-3">{clip.description}</p>
+                                                <div className="flex items-center space-x-4 text-xs text-slate-500">
+                                                    <span className="flex items-center space-x-1">
+                                                        <Clock className="w-3 h-3" />
+                                                        <span>{formatTime(clip.start)} - {formatTime(clip.end)}</span>
+                                                    </span>
+                                                    <span className="flex items-center space-x-1">
+                                                        <span>Duration: {formatTime(clip.duration)}</span>
+                                                    </span>
+                                                    <span className="flex items-center space-x-1">
+                                                        <Star className="w-3 h-3 text-amber-400" />
+                                                        <span>Importance: {clip.importance}/10</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {results.clips.message && (
+                                    <p className="text-sm text-slate-500 text-center mt-4">{results.clips.message}</p>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12 text-slate-500">
+                                <Scissors className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                                <p>Clip extraction results will appear here.</p>
+                                <p className="text-sm mt-1">Use "Extract Clips" to find key moments.</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

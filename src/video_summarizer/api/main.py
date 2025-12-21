@@ -392,12 +392,22 @@ chat_sessions: Dict[str, Any] = {}
 
 @app.post("/api/chat/start")
 def start_chat(request: ChatStartRequest):
+    """Start a new chat session about a video transcript."""
     session_id = str(uuid.uuid4())
+    
+    # Get transcript text - try text first, then fall back to file path
     text = request.transcript_text
-    # ... handle path fallback if needed ...
+    if not text and request.transcript_path:
+        if os.path.exists(request.transcript_path):
+            with open(request.transcript_path, "r", encoding="utf-8") as f:
+                text = f.read()
+    
     if not text:
-         raise HTTPException(status_code=400, detail="Transcript required")
-         
+        raise HTTPException(status_code=400, detail="Transcript text or path required")
+    
+    print(f"[Chat Start] Provider: {request.provider}, Model: {request.model}")
+    print(f"[Chat Start] Transcript length: {len(text)} chars")
+    
     session = create_chat_session(transcript=text, provider=request.provider, model=request.model)
     chat_sessions[session_id] = session
     return {"session_id": session_id}
@@ -431,21 +441,15 @@ def extract_clips_endpoint(request: ExtractClipsRequest):
         if not os.path.exists(request.video_path):
             raise HTTPException(status_code=400, detail=f"Video file not found: {request.video_path}")
         
+        print(f"[Extract Clips] Provider: {request.provider}, Model: {request.model}, Num clips: {request.num_clips}")
+        print(f"[Extract Clips] Transcript length: {len(text)} chars, Video: {request.video_path}")
+        
         # Use VideoSummarizer to extract clips
         summarizer = VideoSummarizer(provider=request.provider, model=request.model)
         clips = summarizer.extract_clips(text, num_clips=request.num_clips)
         
-        # Convert clips to serializable format
-        clips_data = []
-        for clip in clips:
-            clips_data.append({
-                "title": clip.title,
-                "start": clip.start,
-                "end": clip.end,
-                "duration": clip.duration,
-                "reason": clip.reason,
-                "importance": clip.importance
-            })
+        # Convert clips to serializable format - use Clip model's to_dict()
+        clips_data = [clip.to_dict() for clip in clips]
         
         # Optionally extract and merge actual video clips
         output_clips = []

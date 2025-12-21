@@ -42,6 +42,7 @@ export function Dashboard() {
         transcriptionLanguage: 'ar',
         outputLanguage: 'english',
         mergeClips: true,
+        provider: 'google',  // 'google' or 'openrouter'
         model: 'gemini-1.5-flash',
     })
 
@@ -260,7 +261,7 @@ export function Dashboard() {
                                                 const res = await apiService.summarize(selectedVideo.transcript_text, {
                                                     output_language: settings.outputLanguage,
                                                     model: settings.model,
-                                                    provider: settings.model.includes('gemini') ? 'google' : 'openrouter'
+                                                    provider: settings.provider
                                                 })
                                                 setResultsFromLibrary({
                                                     transcript: selectedVideo.transcript_text,
@@ -296,7 +297,7 @@ export function Dashboard() {
                                             try {
                                                 const res = await apiService.startChat(selectedVideo.transcript_text, {
                                                     model: settings.model,
-                                                    provider: settings.model.includes('gemini') ? 'google' : 'openrouter'
+                                                    provider: settings.provider
                                                 })
                                                 setResultsFromLibrary({
                                                     transcript: selectedVideo.transcript_text,
@@ -336,7 +337,7 @@ export function Dashboard() {
                                                     {
                                                         num_clips: 5,
                                                         model: settings.model,
-                                                        provider: settings.model.includes('gemini') ? 'google' : 'openrouter',
+                                                        provider: settings.provider,
                                                         merge: settings.mergeClips
                                                     }
                                                 )
@@ -451,6 +452,20 @@ export function Dashboard() {
                                             </select>
                                         </div>
 
+                                        {/* AI Provider */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs text-slate-400 font-medium uppercase tracking-wide">AI Provider</label>
+                                            <select
+                                                value={settings.provider}
+                                                onChange={(e) => setSettings({ ...settings, provider: e.target.value })}
+                                                disabled={isProcessing}
+                                                className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-4 py-3 text-sm text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 outline-none transition-all"
+                                            >
+                                                <option value="google">Google (Gemini)</option>
+                                                <option value="openrouter">OpenRouter</option>
+                                            </select>
+                                        </div>
+
                                         {/* AI Model */}
                                         <div className="space-y-2">
                                             <label className="text-xs text-slate-400 font-medium uppercase tracking-wide">AI Model</label>
@@ -540,7 +555,7 @@ export function Dashboard() {
                                                                     const res = await apiService.summarize(results.transcript, {
                                                                         output_language: settings.outputLanguage,
                                                                         model: settings.model,
-                                                                        provider: settings.model.includes('gemini') ? 'google' : 'openrouter'
+                                                                        provider: settings.provider
                                                                     })
                                                                     setResultsFromLibrary({
                                                                         ...results,
@@ -570,7 +585,7 @@ export function Dashboard() {
                                                                 try {
                                                                     const res = await apiService.startChat(results.transcript, {
                                                                         model: settings.model,
-                                                                        provider: settings.model.includes('gemini') ? 'google' : 'openrouter'
+                                                                        provider: settings.provider
                                                                     })
                                                                     setResultsFromLibrary({
                                                                         ...results,
@@ -604,7 +619,7 @@ export function Dashboard() {
                                                                         {
                                                                             num_clips: 5,
                                                                             model: settings.model,
-                                                                            provider: settings.model.includes('gemini') ? 'google' : 'openrouter',
+                                                                            provider: settings.provider,
                                                                             merge: settings.mergeClips
                                                                         }
                                                                     )
