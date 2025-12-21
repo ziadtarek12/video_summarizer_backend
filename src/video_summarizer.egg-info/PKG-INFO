@@ -21,6 +21,9 @@ Requires-Dist: yt-dlp>=2023.0.0
 Requires-Dist: ffmpeg-python>=0.2.0
 Requires-Dist: click>=8.0.0
 Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: fastapi>=0.109.0
+Requires-Dist: uvicorn>=0.27.0
+Requires-Dist: python-multipart>=0.0.7
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
@@ -40,6 +43,16 @@ A modular Python CLI tool for transcribing Arabic videos using Whisper Large v3 
 - 🔗 **Clip Merging**: Combine extracted clips into a single video
 - 💬 **Video Chat**: Interactive Q&A about video content with streaming responses
 - 🎥 **Auto-Export**: Export clips as separate video files
+- 💻 **Web Interface**: Integrated modern Web UI for easy interaction
+
+## Web UI
+
+To start the Video Summarizer API with the integrated web interface (auto-installs dependencies if needed):
+
+```bash
+python run_backend.py
+```
+Then open [http://localhost:8000](http://localhost:8000) to use the application.
 
 ## Installation
 
@@ -86,6 +99,10 @@ Edit `.env` with your settings:
 ```env
 # Choose provider: "google" or "openrouter"
 LLM_PROVIDER=google
+
+## Cookies (Optional)
+
+If you encounter "Sign in to confirm you’re not a bot" errors when downloading from YouTube, export your `cookies.txt` from a browser and place it in the project root directory. The application will automatically use it.
 
 # Google AI Studio (get key from https://aistudio.google.com/)
 GOOGLE_API_KEY=your_google_api_key

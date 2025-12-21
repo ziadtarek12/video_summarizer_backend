@@ -9,6 +9,7 @@ src/video_summarizer.egg-info/dependency_links.txt
 src/video_summarizer.egg-info/entry_points.txt
 src/video_summarizer.egg-info/requires.txt
 src/video_summarizer.egg-info/top_level.txt
+src/video_summarizer/api/main.py
 src/video_summarizer/cli/__init__.py
 src/video_summarizer/cli/main.py
 src/video_summarizer/llm/__init__.py
