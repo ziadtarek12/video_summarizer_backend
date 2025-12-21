@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Video, LogOut, Settings, History, Play, RefreshCw, X, Sparkles, MessageSquare, Scissors } from 'lucide-react'
+import { Video, LogOut, Settings, History, Play, RefreshCw, X, Sparkles, MessageSquare, Scissors, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useVideoProcessing } from '../hooks/useVideoProcessing'
 import { LogTerminal } from '../components/LogTerminal'
@@ -28,6 +28,7 @@ export function Dashboard() {
     const [libraryVideos, setLibraryVideos] = useState([])
     const [selectedVideo, setSelectedVideo] = useState(null)
     const [loadingVideo, setLoadingVideo] = useState(false)
+    const [actionLoading, setActionLoading] = useState(null) // 'summarize' | 'chat' | 'clips' | null
 
     // App configuration from backend
     const [appConfig, setAppConfig] = useState({
@@ -240,7 +241,7 @@ export function Dashboard() {
                         )}
 
                         {/* Action Buttons for Library Video */}
-                        {selectedVideo && selectedVideo.transcript_text && (
+                        {selectedVideo && selectedVideo.transcript_text && !results && (
                             <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -254,66 +255,142 @@ export function Dashboard() {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <button
                                         onClick={async () => {
-                                            toggleFeature('summarize')
-                                            // Trigger summarization
-                                            const res = await apiService.summarize(selectedVideo.transcript_text, {
-                                                output_language: settings.outputLanguage,
-                                                model: settings.model,
-                                                provider: settings.model.includes('gemini') ? 'google' : 'openrouter'
-                                            })
-                                            setResultsFromLibrary({
-                                                transcript: selectedVideo.transcript_text,
-                                                videoPath: selectedVideo.file_path,
-                                                videoId: selectedVideo.id,
-                                                summary: res.data
-                                            })
+                                            setActionLoading('summarize')
+                                            try {
+                                                const res = await apiService.summarize(selectedVideo.transcript_text, {
+                                                    output_language: settings.outputLanguage,
+                                                    model: settings.model,
+                                                    provider: settings.model.includes('gemini') ? 'google' : 'openrouter'
+                                                })
+                                                setResultsFromLibrary({
+                                                    transcript: selectedVideo.transcript_text,
+                                                    videoPath: selectedVideo.file_path,
+                                                    videoId: selectedVideo.id,
+                                                    summary: res.data
+                                                })
+                                            } catch (e) {
+                                                console.error('Summarization failed:', e)
+                                            } finally {
+                                                setActionLoading(null)
+                                            }
                                         }}
-                                        disabled={isProcessing}
-                                        className="flex flex-col items-center space-y-3 p-6 bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl hover:from-amber-500/20 hover:to-orange-500/20 transition-all disabled:opacity-50"
+                                        disabled={isProcessing || actionLoading !== null}
+                                        className="flex flex-col items-center space-y-3 p-6 bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl hover:from-amber-500/20 hover:to-orange-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <Sparkles className="w-8 h-8 text-amber-400" />
+                                        {actionLoading === 'summarize' ? (
+                                            <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+                                        ) : (
+                                            <Sparkles className="w-8 h-8 text-amber-400" />
+                                        )}
                                         <div className="text-center">
                                             <div className="font-semibold text-white">Summarize</div>
-                                            <div className="text-xs text-slate-400 mt-1">Generate AI summary</div>
+                                            <div className="text-xs text-slate-400 mt-1">
+                                                {actionLoading === 'summarize' ? 'Generating...' : 'Generate AI summary'}
+                                            </div>
                                         </div>
                                     </button>
 
                                     <button
                                         onClick={async () => {
-                                            toggleFeature('chat')
-                                            const res = await apiService.startChat(selectedVideo.transcript_text)
-                                            setResultsFromLibrary({
-                                                transcript: selectedVideo.transcript_text,
-                                                videoPath: selectedVideo.file_path,
-                                                videoId: selectedVideo.id,
-                                                chatSessionId: res.data.session_id
-                                            })
+                                            setActionLoading('chat')
+                                            try {
+                                                const res = await apiService.startChat(selectedVideo.transcript_text)
+                                                setResultsFromLibrary({
+                                                    transcript: selectedVideo.transcript_text,
+                                                    videoPath: selectedVideo.file_path,
+                                                    videoId: selectedVideo.id,
+                                                    chatSessionId: res.data.session_id
+                                                })
+                                            } catch (e) {
+                                                console.error('Chat start failed:', e)
+                                            } finally {
+                                                setActionLoading(null)
+                                            }
                                         }}
-                                        disabled={isProcessing}
-                                        className="flex flex-col items-center space-y-3 p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-xl hover:from-indigo-500/20 hover:to-purple-500/20 transition-all disabled:opacity-50"
+                                        disabled={isProcessing || actionLoading !== null}
+                                        className="flex flex-col items-center space-y-3 p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-xl hover:from-indigo-500/20 hover:to-purple-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <MessageSquare className="w-8 h-8 text-indigo-400" />
+                                        {actionLoading === 'chat' ? (
+                                            <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                                        ) : (
+                                            <MessageSquare className="w-8 h-8 text-indigo-400" />
+                                        )}
                                         <div className="text-center">
                                             <div className="font-semibold text-white">Chat</div>
-                                            <div className="text-xs text-slate-400 mt-1">Ask questions</div>
+                                            <div className="text-xs text-slate-400 mt-1">
+                                                {actionLoading === 'chat' ? 'Starting...' : 'Ask questions'}
+                                            </div>
                                         </div>
                                     </button>
 
                                     <button
                                         onClick={async () => {
-                                            toggleFeature('clips')
-                                            // Trigger clip extraction
-                                            alert('Clip extraction will be implemented here')
+                                            setActionLoading('clips')
+                                            try {
+                                                const res = await apiService.extractClips(
+                                                    selectedVideo.transcript_path || null,
+                                                    selectedVideo.file_path,
+                                                    {
+                                                        num_clips: 5,
+                                                        model: settings.model,
+                                                        provider: settings.model.includes('gemini') ? 'google' : 'openrouter',
+                                                        merge: settings.mergeClips
+                                                    }
+                                                )
+                                                setResultsFromLibrary({
+                                                    transcript: selectedVideo.transcript_text,
+                                                    videoPath: selectedVideo.file_path,
+                                                    videoId: selectedVideo.id,
+                                                    clips: res.data
+                                                })
+                                            } catch (e) {
+                                                console.error('Clip extraction failed:', e)
+                                            } finally {
+                                                setActionLoading(null)
+                                            }
                                         }}
-                                        disabled={isProcessing}
-                                        className="flex flex-col items-center space-y-3 p-6 bg-gradient-to-br from-rose-500/10 to-pink-500/10 border border-rose-500/20 rounded-xl hover:from-rose-500/20 hover:to-pink-500/20 transition-all disabled:opacity-50"
+                                        disabled={isProcessing || actionLoading !== null}
+                                        className="flex flex-col items-center space-y-3 p-6 bg-gradient-to-br from-rose-500/10 to-pink-500/10 border border-rose-500/20 rounded-xl hover:from-rose-500/20 hover:to-pink-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <Scissors className="w-8 h-8 text-rose-400" />
+                                        {actionLoading === 'clips' ? (
+                                            <Loader2 className="w-8 h-8 text-rose-400 animate-spin" />
+                                        ) : (
+                                            <Scissors className="w-8 h-8 text-rose-400" />
+                                        )}
                                         <div className="text-center">
                                             <div className="font-semibold text-white">Extract Clips</div>
-                                            <div className="text-xs text-slate-400 mt-1">Find key moments</div>
+                                            <div className="text-xs text-slate-400 mt-1">
+                                                {actionLoading === 'clips' ? 'Extracting...' : 'Find key moments'}
+                                            </div>
                                         </div>
                                     </button>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* Library Video Without Transcript */}
+                        {selectedVideo && !selectedVideo.transcript_text && !results && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.1 }}
+                                className="glass-card p-6 border-amber-500/20"
+                            >
+                                <div className="flex items-start space-x-4">
+                                    <div className="p-3 bg-amber-500/20 rounded-xl">
+                                        <Video className="w-6 h-6 text-amber-400" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-lg font-semibold text-white mb-2">Transcript Not Available</h3>
+                                        <p className="text-sm text-slate-400 mb-4">
+                                            This video from your library doesn't have a transcript yet.
+                                            The original video file may have been processed without saving the transcript,
+                                            or the file may no longer be accessible.
+                                        </p>
+                                        <p className="text-sm text-slate-500">
+                                            To process this video, please upload the original file again or use a YouTube URL.
+                                        </p>
+                                    </div>
                                 </div>
                             </motion.div>
                         )}
@@ -430,7 +507,7 @@ export function Dashboard() {
                                 )}
 
                                 {results && (
-                                    <div className="space-y-4">
+                                    <div className="space-y-6">
                                         <div className="flex justify-between items-center">
                                             <h3 className="text-lg font-semibold text-white">Analysis Results</h3>
                                             <button
@@ -442,6 +519,113 @@ export function Dashboard() {
                                             </button>
                                         </div>
                                         <ResultsDashboard results={results} activeFeatures={features} />
+
+                                        {/* Quick Actions for Additional Processing */}
+                                        {results.transcript && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-5 border border-slate-800/50"
+                                            >
+                                                <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Quick Actions</h4>
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    {!results.summary && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                setActionLoading('summarize')
+                                                                try {
+                                                                    const res = await apiService.summarize(results.transcript, {
+                                                                        output_language: settings.outputLanguage,
+                                                                        model: settings.model,
+                                                                        provider: settings.model.includes('gemini') ? 'google' : 'openrouter'
+                                                                    })
+                                                                    setResultsFromLibrary({
+                                                                        ...results,
+                                                                        summary: res.data
+                                                                    })
+                                                                } catch (e) {
+                                                                    console.error('Summarization failed:', e)
+                                                                } finally {
+                                                                    setActionLoading(null)
+                                                                }
+                                                            }}
+                                                            disabled={actionLoading !== null}
+                                                            className="flex items-center justify-center space-x-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl hover:bg-amber-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            {actionLoading === 'summarize' ? (
+                                                                <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                                                            ) : (
+                                                                <Sparkles className="w-4 h-4 text-amber-400" />
+                                                            )}
+                                                            <span className="text-sm text-amber-400 font-medium">Summarize</span>
+                                                        </button>
+                                                    )}
+                                                    {!results.chatSessionId && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                setActionLoading('chat')
+                                                                try {
+                                                                    const res = await apiService.startChat(results.transcript)
+                                                                    setResultsFromLibrary({
+                                                                        ...results,
+                                                                        chatSessionId: res.data.session_id
+                                                                    })
+                                                                } catch (e) {
+                                                                    console.error('Chat start failed:', e)
+                                                                } finally {
+                                                                    setActionLoading(null)
+                                                                }
+                                                            }}
+                                                            disabled={actionLoading !== null}
+                                                            className="flex items-center justify-center space-x-2 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl hover:bg-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            {actionLoading === 'chat' ? (
+                                                                <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+                                                            ) : (
+                                                                <MessageSquare className="w-4 h-4 text-indigo-400" />
+                                                            )}
+                                                            <span className="text-sm text-indigo-400 font-medium">Start Chat</span>
+                                                        </button>
+                                                    )}
+                                                    {!results.clips && results.videoPath && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                setActionLoading('clips')
+                                                                try {
+                                                                    const res = await apiService.extractClips(
+                                                                        null,
+                                                                        results.videoPath,
+                                                                        {
+                                                                            num_clips: 5,
+                                                                            model: settings.model,
+                                                                            provider: settings.model.includes('gemini') ? 'google' : 'openrouter',
+                                                                            merge: settings.mergeClips
+                                                                        }
+                                                                    )
+                                                                    setResultsFromLibrary({
+                                                                        ...results,
+                                                                        clips: res.data
+                                                                    })
+                                                                } catch (e) {
+                                                                    console.error('Clip extraction failed:', e)
+                                                                } finally {
+                                                                    setActionLoading(null)
+                                                                }
+                                                            }}
+                                                            disabled={actionLoading !== null}
+                                                            className="flex items-center justify-center space-x-2 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl hover:bg-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        >
+                                                            {actionLoading === 'clips' ? (
+                                                                <Loader2 className="w-4 h-4 text-rose-400 animate-spin" />
+                                                            ) : (
+                                                                <Scissors className="w-4 h-4 text-rose-400" />
+                                                            )}
+                                                            <span className="text-sm text-rose-400 font-medium">Extract Clips</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        )}
                                     </div>
                                 )}
 

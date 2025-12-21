@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Upload, Link, Youtube, Play, CheckCircle } from 'lucide-react'
+import { Upload, Link, Youtube, Play, CheckCircle, X, FileVideo } from 'lucide-react'
 import clsx from 'clsx'
 import { motion } from 'framer-motion'
 
@@ -7,6 +7,7 @@ export function UploadSection({ onFileSelect, onUrlSubmit, isProcessing, hasLibr
     const [activeTab, setActiveTab] = useState('file')
     const [url, setUrl] = useState('')
     const [dragActive, setDragActive] = useState(false)
+    const [stagedFile, setStagedFile] = useState(null)
     const fileInputRef = useRef(null)
 
     const handleDragOver = (e) => {
@@ -29,13 +30,27 @@ export function UploadSection({ onFileSelect, onUrlSubmit, isProcessing, hasLibr
 
         const files = e.dataTransfer.files
         if (files && files.length > 0) {
-            onFileSelect(files[0])
+            setStagedFile(files[0])
         }
     }
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files.length > 0) {
-            onFileSelect(e.target.files[0])
+            setStagedFile(e.target.files[0])
+        }
+    }
+
+    const handleStartProcessing = () => {
+        if (stagedFile) {
+            onFileSelect(stagedFile)
+            setStagedFile(null)
+        }
+    }
+
+    const handleClearStaged = () => {
+        setStagedFile(null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
         }
     }
 
@@ -101,54 +116,94 @@ export function UploadSection({ onFileSelect, onUrlSubmit, isProcessing, hasLibr
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        onClick={() => !isProcessing && fileInputRef.current?.click()}
-                        className={clsx(
-                            "border-2 border-dashed rounded-2xl p-10 transition-all duration-300 flex flex-col items-center justify-center text-center space-y-5 group cursor-pointer",
-                            isProcessing
-                                ? "border-slate-800 bg-slate-900/30 opacity-50 cursor-not-allowed"
-                                : dragActive
-                                    ? "border-primary-500 bg-primary-500/10"
-                                    : "border-slate-700/50 bg-slate-900/30 hover:border-primary-500/50 hover:bg-slate-800/30"
-                        )}
+                        className="space-y-4"
                     >
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            className="hidden"
-                            accept="video/*,audio/*"
-                        />
-                        <div className={clsx(
-                            "p-5 rounded-2xl transition-all duration-300",
-                            isProcessing
-                                ? "bg-slate-800"
-                                : dragActive
-                                    ? "bg-primary-500/20 scale-110"
-                                    : "bg-slate-800/50 group-hover:bg-primary-500/10"
-                        )}>
-                            <Upload className={clsx(
-                                "w-10 h-10 transition-all",
-                                isProcessing
-                                    ? "text-slate-600"
-                                    : dragActive
-                                        ? "text-primary-400"
-                                        : "text-slate-400 group-hover:text-primary-400"
-                            )} />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-semibold text-slate-200 mb-1">
-                                {isProcessing ? 'Processing in progress...' : 'Upload Video or Audio'}
-                            </h3>
-                            <p className="text-slate-500">
-                                Drag & drop or click to browse
-                            </p>
-                            <p className="text-xs text-slate-600 mt-2">
-                                Supports MP4, MOV, AVI, MP3, WAV and more
-                            </p>
-                        </div>
+                        {/* Staged File Preview */}
+                        {stagedFile ? (
+                            <div className="bg-gradient-to-r from-primary-500/10 to-indigo-500/10 border border-primary-500/30 rounded-2xl p-6">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-4">
+                                        <div className="p-3 bg-primary-500/20 rounded-xl">
+                                            <FileVideo className="w-6 h-6 text-primary-400" />
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-white truncate max-w-xs">{stagedFile.name}</p>
+                                            <p className="text-sm text-slate-400">
+                                                {(stagedFile.size / (1024 * 1024)).toFixed(2)} MB
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleClearStaged(); }}
+                                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={handleStartProcessing}
+                                    disabled={isProcessing}
+                                    className="w-full mt-4 btn-primary flex justify-center items-center py-3.5 space-x-2"
+                                >
+                                    <Play className="w-5 h-5" />
+                                    <span className="font-semibold">Start Processing</span>
+                                </button>
+                                <p className="text-xs text-center text-slate-500 mt-2">
+                                    Click to transcribe and analyze your video
+                                </p>
+                            </div>
+                        ) : (
+                            <div
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                onClick={() => !isProcessing && fileInputRef.current?.click()}
+                                className={clsx(
+                                    "border-2 border-dashed rounded-2xl p-10 transition-all duration-300 flex flex-col items-center justify-center text-center space-y-5 group cursor-pointer",
+                                    isProcessing
+                                        ? "border-slate-800 bg-slate-900/30 opacity-50 cursor-not-allowed"
+                                        : dragActive
+                                            ? "border-primary-500 bg-primary-500/10"
+                                            : "border-slate-700/50 bg-slate-900/30 hover:border-primary-500/50 hover:bg-slate-800/30"
+                                )}
+                            >
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                    accept="video/*,audio/*"
+                                />
+                                <div className={clsx(
+                                    "p-5 rounded-2xl transition-all duration-300",
+                                    isProcessing
+                                        ? "bg-slate-800"
+                                        : dragActive
+                                            ? "bg-primary-500/20 scale-110"
+                                            : "bg-slate-800/50 group-hover:bg-primary-500/10"
+                                )}>
+                                    <Upload className={clsx(
+                                        "w-10 h-10 transition-all",
+                                        isProcessing
+                                            ? "text-slate-600"
+                                            : dragActive
+                                                ? "text-primary-400"
+                                                : "text-slate-400 group-hover:text-primary-400"
+                                    )} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-slate-200 mb-1">
+                                        {isProcessing ? 'Processing in progress...' : 'Select Video or Audio'}
+                                    </h3>
+                                    <p className="text-slate-500">
+                                        Drag & drop or click to browse
+                                    </p>
+                                    <p className="text-xs text-slate-600 mt-2">
+                                        Supports MP4, MOV, AVI, MP3, WAV and more
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </motion.div>
                 ) : (
                     <motion.div

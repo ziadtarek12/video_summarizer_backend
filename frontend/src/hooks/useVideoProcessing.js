@@ -30,16 +30,26 @@ export function useVideoProcessing() {
         setError(null)
     }
 
-    // Set results directly from library video (allows reprocessing without re-transcription)
+    // Set results directly from library video or update existing results
+    // Allows reprocessing without re-transcription and adding features incrementally
     const setResultsFromLibrary = (libraryData) => {
-        reset()
-        setResults({
-            transcript: libraryData.transcript,
-            videoPath: libraryData.videoPath,
-            videoId: libraryData.videoId,
-            fromLibrary: true
+        setResults(prev => {
+            const newResults = {
+                ...(prev || {}),
+                transcript: libraryData.transcript || prev?.transcript,
+                videoPath: libraryData.videoPath || prev?.videoPath,
+                videoId: libraryData.videoId || prev?.videoId,
+                fromLibrary: true
+            }
+            // Add optional fields if present
+            if (libraryData.summary !== undefined) newResults.summary = libraryData.summary
+            if (libraryData.chatSessionId !== undefined) newResults.chatSessionId = libraryData.chatSessionId
+            if (libraryData.clips !== undefined) newResults.clips = libraryData.clips
+            return newResults
         })
-        addLog(`Loaded video from library (ID: ${libraryData.videoId})`, 'success')
+        if (!results) {
+            addLog(`Loaded video from library (ID: ${libraryData.videoId})`, 'success')
+        }
         setStatus('completed')
     }
 
