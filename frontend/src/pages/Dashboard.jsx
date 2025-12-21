@@ -469,7 +469,18 @@ export function Dashboard() {
                                             <label className="text-xs text-slate-400 font-medium uppercase tracking-wide">AI Provider</label>
                                             <select
                                                 value={settings.provider}
-                                                onChange={(e) => setSettings({ ...settings, provider: e.target.value })}
+                                                onChange={(e) => {
+                                                    const newProvider = e.target.value
+                                                    // Filter models for new provider
+                                                    const providerModels = appConfig.models.filter(m =>
+                                                        newProvider === 'google'
+                                                            ? m.toLowerCase().includes('gemini')
+                                                            : !m.toLowerCase().includes('gemini')
+                                                    )
+                                                    // Auto-select first model for new provider
+                                                    const newModel = providerModels.length > 0 ? providerModels[0] : settings.model
+                                                    setSettings({ ...settings, provider: newProvider, model: newModel })
+                                                }}
                                                 disabled={isProcessing}
                                                 className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-4 py-3 text-sm text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 outline-none transition-all"
                                             >
@@ -478,7 +489,7 @@ export function Dashboard() {
                                             </select>
                                         </div>
 
-                                        {/* AI Model */}
+                                        {/* AI Model - filtered by provider */}
                                         <div className="space-y-2">
                                             <label className="text-xs text-slate-400 font-medium uppercase tracking-wide">AI Model</label>
                                             <select
@@ -487,9 +498,16 @@ export function Dashboard() {
                                                 disabled={isProcessing}
                                                 className="w-full bg-slate-950 border border-slate-700/50 rounded-xl px-4 py-3 text-sm text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500/50 outline-none transition-all"
                                             >
-                                                {appConfig.models.map((model) => (
-                                                    <option key={model} value={model}>{model}</option>
-                                                ))}
+                                                {appConfig.models
+                                                    .filter(model =>
+                                                        settings.provider === 'google'
+                                                            ? model.toLowerCase().includes('gemini')
+                                                            : !model.toLowerCase().includes('gemini')
+                                                    )
+                                                    .map((model) => (
+                                                        <option key={model} value={model}>{model}</option>
+                                                    ))
+                                                }
                                             </select>
                                         </div>
 
