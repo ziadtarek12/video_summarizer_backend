@@ -69,7 +69,7 @@ export function useVideoProcessing() {
             let transcriptionResult
 
             const commonOptions = {
-                language: null, // Auto-detect
+                language: settings.transcriptionLanguage || null, // Use selected language
                 model: 'base', // Whisper model
                 device: 'auto'
             }
@@ -83,6 +83,12 @@ export function useVideoProcessing() {
                 })
                 transcriptionResult = response.data
                 addLog('Upload completed.', 'success')
+            } else if (inputType === 'library_file') {
+                // Use existing file from library - re-transcribe with current settings
+                addLog(`Reprocessing library video: ${input}`, 'loading')
+                const response = await apiService.transcribeExisting(input, commonOptions)
+                transcriptionResult = response.data
+                addLog('Reprocessing started.', 'success')
             } else {
                 addLog(`Processing YouTube URL: ${input}`, 'loading')
                 const response = await apiService.transcribeUrl(input, commonOptions)

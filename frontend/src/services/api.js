@@ -71,6 +71,16 @@ export const apiService = {
         })
     },
 
+    // Transcribe an existing file from the library
+    transcribeExisting: async (filePath, options) => {
+        return API.post('/transcribe/existing', {
+            file_path: filePath,
+            language: options.language,
+            model: options.model,
+            device: options.device
+        })
+    },
+
     getJobStatus: async (jobId) => {
         return API.get(`/jobs/${jobId}`)
     },

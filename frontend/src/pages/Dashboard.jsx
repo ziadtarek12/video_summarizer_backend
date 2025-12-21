@@ -113,6 +113,20 @@ export function Dashboard() {
         processVideo(input, type, settings)
     }
 
+    // Handler for starting fresh processing with a library video's file
+    // Does NOT load any cached data - starts completely fresh
+    const handleReprocessLibraryVideo = (video) => {
+        // Use the video file path and process as if it was a new file upload
+        // This will re-transcribe with current language settings
+        if (video.file_path) {
+            // Clear any existing selection
+            setSelectedVideo(null)
+            reset()
+            // Process using the existing file path (backend will re-transcribe)
+            processVideo(video.file_path, 'library_file', settings)
+        }
+    }
+
     const handleClearSelection = () => {
         setSelectedVideo(null)
         reset()
@@ -550,7 +564,7 @@ export function Dashboard() {
                                             onFileSelect={(file) => handleProcess(file, 'file')}
                                             onUrlSubmit={(url) => handleProcess(url, 'url')}
                                             libraryVideos={libraryVideos}
-                                            onLibrarySelect={handleSelectLibraryVideo}
+                                            onLibrarySelect={handleReprocessLibraryVideo}
                                             isProcessing={isProcessing}
                                             hasLibrarySelection={!!selectedVideo?.transcript_text}
                                         />

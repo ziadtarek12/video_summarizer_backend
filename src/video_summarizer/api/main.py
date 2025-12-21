@@ -364,6 +364,49 @@ def transcribe_file(
     )
     return {"job_id": job_id, "status": "pending"}
 
+
+class TranscribeExistingRequest(BaseModel):
+    file_path: str
+    language: Optional[str] = None
+    model: Optional[str] = None
+    device: Optional[str] = "auto"
+
+
+@app.post("/api/transcribe/existing")
+def transcribe_existing(
+    request: TranscribeExistingRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Transcribe an existing video file from the library (fresh transcription with new settings)."""
+    # Verify file exists
+    if not os.path.exists(request.file_path):
+        raise HTTPException(status_code=404, detail="Video file not found")
+    
+    # Security check - only allow files from output directory
+    if not request.file_path.startswith("output/"):
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    
+    job_id = str(uuid.uuid4())
+    new_job = models.Job(id=job_id, type="transcribe", status=JobStatus.PENDING)
+    db.add(new_job)
+    db.commit()
+    
+    print(f"[Transcribe Existing] Starting fresh transcription of: {request.file_path}")
+    print(f"[Transcribe Existing] Language: {request.language}, Job ID: {job_id}")
+    
+    background_tasks.add_task(
+        process_transcription, 
+        job_id, 
+        request.file_path, 
+        request.model, 
+        request.language, 
+        request.device,
+        current_user.id
+    )
+    return {"job_id": job_id, "status": "pending"}
+
 # --- Summarize, Chat, Clips (Basic Implementation without DB Persistence for now) ---
 # For this iteration, we keep them simple, but they should really be Jobs too.
 
