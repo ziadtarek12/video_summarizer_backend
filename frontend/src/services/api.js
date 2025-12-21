@@ -83,17 +83,21 @@ export const apiService = {
         })
     },
 
-    extractClips: async (transcriptPath, videoPath, options) => {
-        // options: { num_clips, provider, model }
+    extractClips: async (transcriptText, videoPath, options) => {
+        // options: { num_clips, provider, model, merge }
         return API.post('/extract-clips', {
-            transcript_path: transcriptPath,
+            transcript_text: transcriptText,
             video_path: videoPath,
             ...options
         })
     },
 
-    startChat: async (transcriptText) => {
-        return API.post('/chat/start', { transcript_text: transcriptText })
+    startChat: async (transcriptText, options = {}) => {
+        // options: { provider, model }
+        return API.post('/chat/start', {
+            transcript_text: transcriptText,
+            ...options
+        })
     },
 
     sendChatMessage: async (sessionId, message) => {

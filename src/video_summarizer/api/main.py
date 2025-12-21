@@ -23,7 +23,7 @@ from video_summarizer.transcription import (
     format_as_srt
 )
 from video_summarizer.llm import VideoSummarizer, create_chat_session
-from video_summarizer.llm.clip_extractor import extract_clips, save_clips_metadata, merge_clips
+from video_summarizer.llm.clip_extractor import extract_clips as extract_video_clips, save_clips_metadata, merge_clips
 
 # DB & Auth Imports
 from video_summarizer.db import models, database, get_db
@@ -268,7 +268,8 @@ class ChatMessageRequest(BaseModel):
     message: str
 
 class ExtractClipsRequest(BaseModel):
-    transcript_path: str
+    transcript_path: Optional[str] = None
+    transcript_text: Optional[str] = None  # Allow passing text directly
     video_path: str
     num_clips: int = 5
     merge: bool = True
@@ -357,9 +358,7 @@ def transcribe_file(
 
 @app.post("/api/summarize")
 def summarize_endpoint(request: SummarizeRequest):
-    # Synchronous for now for simplicity or use background task like before
-    # User wanted "Original Language vs English" -> handled by request.output_language
-    
+    """Generate a summary from transcript text."""
     try:
         text = request.transcript_text
         if not text and request.transcript_path:
@@ -370,6 +369,9 @@ def summarize_endpoint(request: SummarizeRequest):
         if not text:
              raise HTTPException(status_code=400, detail="Transcript text required")
 
+        print(f"[Summarize] Provider: {request.provider}, Model: {request.model}, Language: {request.output_language}")
+        print(f"[Summarize] Transcript length: {len(text)} chars")
+        
         summarizer = VideoSummarizer(provider=request.provider, model=request.model)
         summary = summarizer.summarize(text, output_language=request.output_language)
         
@@ -377,8 +379,13 @@ def summarize_endpoint(request: SummarizeRequest):
             "text": summary.text,
             "key_points": summary.key_points
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        print(f"[Summarize ERROR] {type(e).__name__}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}")
 
 # Chat Sessions (In-memory is fine for transient chat)
 chat_sessions: Dict[str, Any] = {}
@@ -409,9 +416,69 @@ def chat_message(request: ChatMessageRequest):
 
 @app.post("/api/extract-clips")
 def extract_clips_endpoint(request: ExtractClipsRequest):
-    # This one is heavy, should be background task really.
-    # ... logic similar to previous ...
-    return {"message": "Not fully implemented in this refactor yet (Logic exists in previous version but needs porting to new structure)"} 
+    """Extract important clips from a video based on transcript."""
+    try:
+        # Get transcript text
+        text = request.transcript_text
+        if not text and request.transcript_path:
+            if os.path.exists(request.transcript_path):
+                with open(request.transcript_path, "r", encoding="utf-8") as f:
+                    text = f.read()
+        
+        if not text:
+            raise HTTPException(status_code=400, detail="Transcript text or path required")
+        
+        if not os.path.exists(request.video_path):
+            raise HTTPException(status_code=400, detail=f"Video file not found: {request.video_path}")
+        
+        # Use VideoSummarizer to extract clips
+        summarizer = VideoSummarizer(provider=request.provider, model=request.model)
+        clips = summarizer.extract_clips(text, num_clips=request.num_clips)
+        
+        # Convert clips to serializable format
+        clips_data = []
+        for clip in clips:
+            clips_data.append({
+                "title": clip.title,
+                "start": clip.start,
+                "end": clip.end,
+                "duration": clip.duration,
+                "reason": clip.reason,
+                "importance": clip.importance
+            })
+        
+        # Optionally extract and merge actual video clips
+        output_clips = []
+        if clips_data:
+            from pathlib import Path
+            output_dir = Path("output") / "clips" / str(uuid.uuid4())[:8]
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            try:
+                # Extract individual clips
+                extracted = extract_video_clips(request.video_path, clips, str(output_dir))
+                output_clips = extracted
+                
+                # Merge if requested
+                if request.merge and len(extracted) > 1:
+                    merged_path = merge_clips(extracted, str(output_dir / "merged.mp4"))
+                    output_clips.append({"type": "merged", "path": merged_path})
+            except Exception as e:
+                # If extraction fails, just return clip metadata
+                print(f"Clip extraction failed: {e}")
+        
+        return {
+            "clips": clips_data,
+            "extracted_files": output_clips,
+            "message": f"Found {len(clips_data)} important clips"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/{full_path:path}")
 async def catch_all(full_path: str):
     # If the request is for an API endpoint that doesn't exist, let it fall through to 404

@@ -294,7 +294,10 @@ export function Dashboard() {
                                         onClick={async () => {
                                             setActionLoading('chat')
                                             try {
-                                                const res = await apiService.startChat(selectedVideo.transcript_text)
+                                                const res = await apiService.startChat(selectedVideo.transcript_text, {
+                                                    model: settings.model,
+                                                    provider: settings.model.includes('gemini') ? 'google' : 'openrouter'
+                                                })
                                                 setResultsFromLibrary({
                                                     transcript: selectedVideo.transcript_text,
                                                     videoPath: selectedVideo.file_path,
@@ -328,7 +331,7 @@ export function Dashboard() {
                                             setActionLoading('clips')
                                             try {
                                                 const res = await apiService.extractClips(
-                                                    selectedVideo.transcript_path || null,
+                                                    selectedVideo.transcript_text,
                                                     selectedVideo.file_path,
                                                     {
                                                         num_clips: 5,
@@ -565,7 +568,10 @@ export function Dashboard() {
                                                             onClick={async () => {
                                                                 setActionLoading('chat')
                                                                 try {
-                                                                    const res = await apiService.startChat(results.transcript)
+                                                                    const res = await apiService.startChat(results.transcript, {
+                                                                        model: settings.model,
+                                                                        provider: settings.model.includes('gemini') ? 'google' : 'openrouter'
+                                                                    })
                                                                     setResultsFromLibrary({
                                                                         ...results,
                                                                         chatSessionId: res.data.session_id
@@ -593,7 +599,7 @@ export function Dashboard() {
                                                                 setActionLoading('clips')
                                                                 try {
                                                                     const res = await apiService.extractClips(
-                                                                        null,
+                                                                        results.transcript,
                                                                         results.videoPath,
                                                                         {
                                                                             num_clips: 5,
