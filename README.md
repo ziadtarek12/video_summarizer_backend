@@ -1,217 +1,208 @@
-# Video Summarizer Backend
+# Video Summarizer
 
-A modular Python CLI tool for transcribing Arabic videos using Whisper Large v3 and generating AI-powered summaries and clip extractions via Google AI Studio (Gemini) or OpenRouter.
+A full-stack application for transcribing, summarizing, and extracting clips from videos using AI. Features a modern React frontend and FastAPI backend with user authentication and video library management.
 
-## Features
+## ✨ Features
 
-- 🎬 **Video Transcription**: Transcribe videos to SRT format using Whisper Large v3
-- 🌐 **YouTube Support**: Directly process YouTube URLs (auto-downloads)
-- 🇸🇦 **Arabic Support**: Optimized for Arabic language transcription
-- 🤖 **Multi-Provider LLM**: Google AI Studio (Gemini) or OpenRouter
-- 📝 **AI Summarization**: Generate summaries in original language or English
-- ✂️ **Clip Extraction**: Automatically identify and extract key moments
-- 🔗 **Clip Merging**: Combine extracted clips into a single video
-- 💬 **Video Chat**: Interactive Q&A about video content with streaming responses
-- 🎥 **Auto-Export**: Export clips as separate video files
-- 💻 **Web Interface**: Integrated modern Web UI for easy interaction
+### Core Processing
+- 🎬 **Video Transcription** - Transcribe videos using Whisper Large v3
+- 🌐 **YouTube Support** - Process YouTube URLs directly (auto-download)
+- 🇸🇦 **Multi-Language** - Arabic and English language support
+- 🤖 **Multi-Provider LLM** - Google AI (Gemini) or OpenRouter
+- 📝 **AI Summarization** - Generate summaries in original or translated language
+- ✂️ **Clip Extraction** - Automatically identify and extract key moments
+- 🔗 **Clip Merging** - Combine extracted clips into a single video
+- 💬 **Video Chat** - Interactive Q&A about video content with streaming
 
-## Web UI
+### Web Application
+- 🎨 **Modern UI** - Glassmorphism design with dark mode
+- 🔐 **User Authentication** - Register/login with JWT tokens
+- 📚 **Video Library** - Save processed videos for reuse
+- 💾 **Data Persistence** - Cached summaries, clips, and transcripts
+- ⬇️ **Clip Downloads** - Download extracted video clips
+- ⚙️ **Configurable** - Select AI provider, model, and language settings
 
-To start the Video Summarizer API with the integrated web interface (auto-installs dependencies if needed):
-
-```bash
-python run_backend.py
-```
-Then open [http://localhost:8000](http://localhost:8000) to use the application.
-
-## Installation
+## 🚀 Quick Start
 
 ### Prerequisites
-
 - Python 3.9+
+- Node.js 18+ (for frontend development)
 - FFmpeg installed on your system
 
-### Install from source
+### Installation
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/ziadtarek12/video_summarizer_backend.git
 cd video_summarizer_backend
 
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
+pip install -e .
 
-# Install in development mode
-pip install -e ".[dev]"
+# Configure environment
+cp .env.example .env
+# Edit .env with your API keys
 ```
 
-### On Google Colab
-
-```python
-# Install FFmpeg
-!apt-get install ffmpeg
-
-# Install the package
-!pip install -r requirements.txt
-!pip install -e .
-```
-
-## Configuration
-
-Copy the example environment file and configure your settings:
+### Running the Application
 
 ```bash
-cp .env.example .env
+# Start the backend server (auto-installs frontend deps if needed)
+python run_backend.py
+
+# Open http://localhost:8000 in your browser
 ```
 
-Edit `.env` with your settings:
+For development with hot reload:
+```bash
+# Terminal 1: Backend
+uvicorn src.video_summarizer.api.main:app --reload --port 8000
+
+# Terminal 2: Frontend
+cd frontend && npm run dev
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+Create a `.env` file with:
 
 ```env
-# Choose provider: "google" or "openrouter"
+# LLM Provider: "google" or "openrouter"
 LLM_PROVIDER=google
 
-## Cookies (Optional)
-
-If you encounter "Sign in to confirm you’re not a bot" errors when downloading from YouTube, export your `cookies.txt` from a browser and place it in the project root directory. The application will automatically use it.
-
-# Google AI Studio (get key from https://aistudio.google.com/)
+# Google AI Studio (https://aistudio.google.com/)
 GOOGLE_API_KEY=your_google_api_key
 GOOGLE_MODEL=gemini-1.5-flash
 
-# OpenRouter (get key from https://openrouter.ai/)
+# OpenRouter (https://openrouter.ai/)
 OPENROUTER_API_KEY=your_openrouter_key
 OPENROUTER_MODEL=meta-llama/llama-3.1-70b-instruct:free
 
-# Whisper settings (defaults are optimized for Arabic)
+# Available Models (comma-separated, shown in UI dropdown)
+# Google models: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash
+# OpenRouter models: meta-llama/llama-3.1-70b-instruct:free, openai/gpt-4o-mini
+AVAILABLE_LLM_MODELS=gemini-1.5-flash,gemini-1.5-pro,meta-llama/llama-3.1-70b-instruct:free
+
+# Whisper settings
 WHISPER_MODEL=large-v3
-WHISPER_LANGUAGE=ar
-WHISPER_DEVICE=auto  # auto, cpu, or cuda
+WHISPER_LANGUAGE=ar  # ar or en
+WHISPER_DEVICE=auto
+
+# Auth
+SECRET_KEY=your-secret-key-here
+
+# Optional: YouTube cookies for age-restricted videos
+# Place cookies.txt in project root
 ```
 
-## Usage
+## 📖 API Endpoints
 
-### Transcribe a Video
+### Authentication
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/register` | POST | Create new user account |
+| `/api/login` | POST | Login and get JWT token |
+
+### Video Processing
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/transcribe/file` | POST | Upload and transcribe video file |
+| `/api/transcribe/url` | POST | Transcribe from YouTube URL |
+| `/api/transcribe/existing` | POST | Re-transcribe library video with new settings |
+| `/api/summarize` | POST | Generate AI summary from transcript |
+| `/api/extract-clips` | POST | Extract and optionally merge video clips |
+| `/api/chat/start` | POST | Start chat session about video |
+| `/api/chat/message` | POST | Send message to chat session |
+
+### Library Management
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/library` | GET | Get user's video library |
+| `/api/videos/{id}` | GET | Get video details with cached results |
+| `/api/clips/download` | GET | Download extracted clip file |
+
+### Configuration
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/config` | GET | Get available languages and models |
+
+## 🖥️ CLI Usage
+
+The application also includes a CLI for command-line usage:
 
 ```bash
-# From a local file
-video-summarizer transcribe video.mp4 --output transcript.srt
+# Transcribe
+video-summarizer transcribe video.mp4 -o transcript.srt
+video-summarizer transcribe "https://youtube.com/watch?v=ID" -o transcript.srt
 
-# From a YouTube URL
-video-summarizer transcribe "https://youtube.com/watch?v=VIDEO_ID" --output transcript.srt
-
-# Force CPU mode (if CUDA issues)
-video-summarizer transcribe video.mp4 --device cpu -o transcript.srt
-```
-
-### Summarize a Transcript
-
-```bash
-# Summary in original language (e.g., Arabic)
-video-summarizer summarize transcript.srt --output-language original
-
-# Summary translated to English
+# Summarize
 video-summarizer summarize transcript.srt --output-language english
 
-# Use specific provider
-video-summarizer summarize transcript.srt --provider google
-video-summarizer summarize transcript.srt --provider openrouter
-```
+# Extract clips
+video-summarizer extract-clips transcript.srt --video video.mp4 --num-clips 5 --merge
 
-### Extract Clips
-
-```bash
-# Extract 5 clips
-video-summarizer extract-clips transcript.srt --video video.mp4 --num-clips 5
-
-# Extract and merge into single video
-video-summarizer extract-clips transcript.srt --video video.mp4 --merge
-
-# Re-encode for accurate cuts
-video-summarizer extract-clips transcript.srt --video video.mp4 --reencode
-```
-
-### Chat About a Video
-
-Interactive Q&A with streaming responses:
-
-```bash
+# Chat
 video-summarizer chat transcript.srt
 
-# Use specific provider
-video-summarizer chat transcript.srt --provider google
-video-summarizer chat transcript.srt --provider openrouter
+# Full pipeline
+video-summarizer process video.mp4 --output-dir ./output --merge
 ```
 
-Commands within chat:
-- Type your question and press Enter
-- `clear` - Reset conversation history
-- `quit` / `exit` / `q` - End session
+## 🏗️ Project Structure
 
-### Full Pipeline
-
-Process a video through the entire pipeline (transcribe → summarize → extract clips):
-
-```bash
-# Basic usage
-video-summarizer process video.mp4 --output-dir ./output
-
-# From YouTube with all options
-video-summarizer process "https://youtube.com/watch?v=VIDEO_ID" \
-    --output-dir ./output \
-    --output-language english \
-    --num-clips 5 \
-    --merge \
-    --provider google
+```
+video_summarizer_backend/
+├── src/video_summarizer/
+│   ├── api/                    # FastAPI Backend
+│   │   ├── main.py            # API routes and endpoints
+│   │   └── auth.py            # JWT authentication
+│   ├── db/                     # Database Layer
+│   │   ├── database.py        # SQLAlchemy setup
+│   │   └── models.py          # User, Video, Job models
+│   ├── transcription/          # Video Processing
+│   │   ├── audio_extractor.py # FFmpeg audio extraction
+│   │   ├── youtube_downloader.py
+│   │   ├── transcriber.py     # Whisper transcription
+│   │   └── srt_formatter.py
+│   ├── llm/                    # AI/LLM Integration
+│   │   ├── client.py          # Multi-provider LLM client
+│   │   ├── summarizer.py      # Summarization logic
+│   │   ├── clip_extractor.py  # Clip extraction & merging
+│   │   ├── chat.py            # Chat session management
+│   │   ├── prompts.py         # Prompt templates
+│   │   └── models.py          # Clip, Summary data models
+│   ├── cli/                    # CLI Interface
+│   │   └── main.py
+│   └── config.py              # Configuration management
+├── frontend/                   # React Frontend
+│   ├── src/
+│   │   ├── pages/             # Dashboard, Login, Register
+│   │   ├── components/        # UI Components
+│   │   ├── hooks/             # React hooks (useVideoProcessing)
+│   │   └── services/          # API client
+│   └── dist/                  # Production build
+├── output/                     # Generated files
+├── videos.db                   # SQLite database
+└── run_backend.py             # Application entry point
 ```
 
-This will generate:
-- `output/transcript.srt` - Full transcription
-- `output/summary.txt` - AI-generated summary
-- `output/clips.json` - Clip metadata
-- `output/clips/` - Extracted video clips
-- `output/merged_clips.mp4` - Combined clips (if `--merge`)
-
-## CLI Options Reference
-
-| Option | Commands | Description |
-|--------|----------|-------------|
-| `--provider`, `-p` | all | LLM provider: `google` or `openrouter` |
-| `--output-language`, `-L` | summarize, process | `original` or `english` |
-| `--num-clips`, `-n` | extract-clips, process | Number of clips to extract |
-| `--merge` | extract-clips, process | Merge clips into single video |
-| `--reencode` | extract-clips, process | Re-encode for accurate cuts |
-| `--device`, `-d` | transcribe | Device: `auto`, `cpu`, `cuda` |
-
-## Development
+## 🧪 Development
 
 ### Running Tests
-
 ```bash
 pytest tests/ -v
 ```
 
-### Project Structure
-
-```
-src/video_summarizer/
-├── __init__.py
-├── config.py              # Configuration management
-├── transcription/
-│   ├── audio_extractor.py # FFmpeg audio extraction
-│   ├── youtube_downloader.py # YouTube video downloading
-│   ├── transcriber.py     # Whisper transcription
-│   └── srt_formatter.py   # SRT format output
-├── llm/
-│   ├── client.py          # Multi-provider LLM client
-│   ├── chat.py            # Chat session management
-│   ├── prompts.py         # Prompt templates
-│   ├── summarizer.py      # Summarization logic
-│   ├── clip_extractor.py  # FFmpeg clip extraction & merging
-│   └── models.py          # Data models
-└── cli/
-    └── main.py            # CLI commands
+### Building Frontend
+```bash
+cd frontend
+npm install
+npm run build
 ```
 
-## License
+## 📄 License
 
 MIT
