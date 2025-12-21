@@ -105,7 +105,8 @@ export function useVideoProcessing() {
             const currentResults = {
                 transcript: job.result.transcript_text, // Updated backend returns plain text here
                 jobId: job.id,
-                videoPath: job.result.video_path
+                videoPath: job.result.video_path,
+                videoId: job.result.video_id  // Video ID for persisting summary/clips
             }
 
             // 3. Process Optional Features
@@ -118,7 +119,8 @@ export function useVideoProcessing() {
                     const summaryRes = await apiService.summarize(currentResults.transcript, {
                         output_language: settings.outputLanguage,
                         model: settings.model,
-                        provider: settings.model.includes('google') ? 'google' : 'openrouter'
+                        provider: settings.provider,
+                        video_id: currentResults.videoId  // Persist to database
                     })
                     addLog('Summary generated.', 'success')
                     currentResults.summary = summaryRes.data

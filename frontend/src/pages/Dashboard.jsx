@@ -585,7 +585,8 @@ export function Dashboard() {
                                                                     const res = await apiService.summarize(results.transcript, {
                                                                         output_language: settings.outputLanguage,
                                                                         model: settings.model,
-                                                                        provider: settings.provider
+                                                                        provider: settings.provider,
+                                                                        video_id: results.videoId  // Persist to database
                                                                     })
                                                                     setResultsFromLibrary({
                                                                         ...results,
@@ -650,7 +651,8 @@ export function Dashboard() {
                                                                             num_clips: 5,
                                                                             model: settings.model,
                                                                             provider: settings.provider,
-                                                                            merge: settings.mergeClips
+                                                                            merge: settings.mergeClips,
+                                                                            video_id: results.videoId  // Persist to database
                                                                         }
                                                                     )
                                                                     setResultsFromLibrary({
