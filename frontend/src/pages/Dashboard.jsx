@@ -49,11 +49,12 @@ export function Dashboard() {
     // Fetch app config on mount
     useEffect(() => {
         loadConfig()
+        loadLibrary()  // Load library on mount for UploadSection
     }, [])
 
     useEffect(() => {
         if (showLibrary) {
-            loadLibrary()
+            loadLibrary()  // Refresh when library modal opens
         }
     }, [showLibrary])
 
@@ -548,6 +549,8 @@ export function Dashboard() {
                                         <UploadSection
                                             onFileSelect={(file) => handleProcess(file, 'file')}
                                             onUrlSubmit={(url) => handleProcess(url, 'url')}
+                                            libraryVideos={libraryVideos}
+                                            onLibrarySelect={handleSelectLibraryVideo}
                                             isProcessing={isProcessing}
                                             hasLibrarySelection={!!selectedVideo?.transcript_text}
                                         />

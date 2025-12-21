@@ -1,9 +1,9 @@
 import React, { useState, useRef } from 'react'
-import { Upload, Link, Youtube, Play, CheckCircle, X, FileVideo } from 'lucide-react'
+import { Upload, Link, Youtube, Play, CheckCircle, X, FileVideo, Library, Clock } from 'lucide-react'
 import clsx from 'clsx'
 import { motion } from 'framer-motion'
 
-export function UploadSection({ onFileSelect, onUrlSubmit, isProcessing, hasLibrarySelection }) {
+export function UploadSection({ onFileSelect, onUrlSubmit, onLibrarySelect, libraryVideos = [], isProcessing, hasLibrarySelection }) {
     const [activeTab, setActiveTab] = useState('file')
     const [url, setUrl] = useState('')
     const [dragActive, setDragActive] = useState(false)
@@ -108,6 +108,22 @@ export function UploadSection({ onFileSelect, onUrlSubmit, isProcessing, hasLibr
                         <span>YouTube URL</span>
                     </div>
                 </button>
+                {libraryVideos.length > 0 && (
+                    <button
+                        onClick={() => setActiveTab('library')}
+                        className={clsx(
+                            "px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                            activeTab === 'library'
+                                ? "bg-slate-800 text-white shadow-lg"
+                                : "text-slate-400 hover:text-slate-200"
+                        )}
+                    >
+                        <div className="flex items-center space-x-2">
+                            <Library className="w-4 h-4" />
+                            <span>My Library</span>
+                        </div>
+                    </button>
+                )}
             </div>
 
             {/* Content */}
@@ -235,6 +251,46 @@ export function UploadSection({ onFileSelect, onUrlSubmit, isProcessing, hasLibr
                         <p className="text-xs text-center text-slate-500">
                             Paste a YouTube URL and we'll download, transcribe, and analyze it automatically
                         </p>
+                    </motion.div>
+                )}
+
+                {activeTab === 'library' && libraryVideos.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="space-y-4"
+                    >
+                        <p className="text-sm text-slate-400 mb-4">
+                            Select a video from your library to process with new AI features
+                        </p>
+                        <div className="max-h-80 overflow-y-auto space-y-2 pr-2">
+                            {libraryVideos.map((video) => (
+                                <button
+                                    key={video.id}
+                                    onClick={() => onLibrarySelect && onLibrarySelect(video)}
+                                    disabled={isProcessing}
+                                    className="w-full flex items-center space-x-4 p-4 bg-slate-900/50 border border-slate-700/50 rounded-xl hover:border-primary-500/50 hover:bg-slate-800/50 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <div className="p-2 bg-primary-500/20 rounded-lg">
+                                        <FileVideo className="w-5 h-5 text-primary-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-white truncate">{video.title || video.filename}</p>
+                                        <div className="flex items-center space-x-3 text-xs text-slate-500 mt-1">
+                                            {video.transcript_text && (
+                                                <span className="text-emerald-400">✓ Transcript</span>
+                                            )}
+                                            {video.created_at && (
+                                                <span className="flex items-center space-x-1">
+                                                    <Clock className="w-3 h-3" />
+                                                    <span>{new Date(video.created_at).toLocaleDateString()}</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
                     </motion.div>
                 )}
             </div>
