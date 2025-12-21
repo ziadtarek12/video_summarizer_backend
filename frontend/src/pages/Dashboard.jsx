@@ -251,8 +251,8 @@ export function Dashboard() {
                             </motion.div>
                         )}
 
-                        {/* Action Buttons for Library Video */}
-                        {selectedVideo && selectedVideo.transcript_text && !results && (
+                        {/* Action Buttons for Library Video - show if no results OR results missing some features */}
+                        {selectedVideo && selectedVideo.transcript_text && (!results || (!results.summary && !results.clips && !results.chatSessionId)) && (
                             <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
