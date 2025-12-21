@@ -1,6 +1,81 @@
 # Video Summarizer Architecture
 
-## Mermaid Flowchart
+## 🎯 Simple Overview (Non-Technical)
+
+This diagram shows how the Video Summarizer works at a high level:
+
+```mermaid
+flowchart LR
+    subgraph You["👤 You"]
+        User[User]
+    end
+
+    subgraph WebApp["🌐 Web Application"]
+        Upload["📤 Upload Video<br/>or YouTube Link"]
+        Watch["👁️ View Results"]
+    end
+
+    subgraph Processing["⚙️ Processing Engine"]
+        Transcribe["🎤 Speech-to-Text<br/>(Whisper AI)"]
+        Summarize["📝 AI Summary<br/>(Gemini/GPT)"]
+        ClipExtract["✂️ Find Key Moments<br/>(AI + Video Cutting)"]
+        ChatBot["💬 Video ChatBot<br/>(Ask Questions)"]
+    end
+
+    subgraph Storage["💾 Your Library"]
+        SavedVideos["📚 Saved Videos"]
+        Transcripts["📄 Transcripts"]
+        Clips["🎬 Video Clips"]
+    end
+
+    User --> Upload
+    Upload --> Transcribe
+    Transcribe --> Summarize
+    Transcribe --> ClipExtract
+    Transcribe --> ChatBot
+    Summarize --> Watch
+    ClipExtract --> Watch
+    ChatBot --> Watch
+    Transcribe --> SavedVideos
+    Summarize --> Transcripts
+    ClipExtract --> Clips
+    Watch --> User
+
+    style You fill:#e3f2fd,stroke:#1976d2
+    style WebApp fill:#e8f5e9,stroke:#388e3c
+    style Processing fill:#fff3e0,stroke:#f57c00
+    style Storage fill:#fce4ec,stroke:#c2185b
+```
+
+### How It Works (Step by Step)
+
+| Step | What Happens | Technology Used |
+|:----:|--------------|-----------------|
+| 1️⃣ | **Upload** - You upload a video file or paste a YouTube link | Web Browser |
+| 2️⃣ | **Transcribe** - The system converts speech to text | Whisper AI (OpenAI's speech recognition) |
+| 3️⃣ | **Analyze** - AI reads the transcript and understands the content | Google Gemini / ChatGPT / Claude |
+| 4️⃣ | **Summarize** - AI creates a summary with key points | Same AI as above |
+| 5️⃣ | **Extract Clips** - AI identifies important moments, video editor cuts them out | AI + FFmpeg (video tool) |
+| 6️⃣ | **Chat** - You can ask questions about the video | AI with memory of conversation |
+| 7️⃣ | **Save** - Everything is saved to your library for later | Database |
+
+### Key Features Explained
+
+| Feature | What It Does |
+|---------|--------------|
+| 🎤 **Transcription** | Converts spoken words in video to written text (Arabic & English) |
+| 📝 **Summarization** | Creates a short summary + bullet points of main ideas |
+| ✂️ **Clip Extraction** | Finds the 3-5 most important moments and cuts them as separate videos |
+| 🔗 **Clip Merging** | Combines all the important clips into one highlight video |
+| 💬 **Video Chat** | Ask questions like "What did they say about X?" and get answers |
+| 📚 **Library** | Your processed videos are saved - no need to re-process them |
+| ⬇️ **Downloads** | Download extracted clips directly to your computer |
+
+---
+
+## 🔧 Technical Architecture
+
+### Detailed Flowchart
 
 ```mermaid
 flowchart TB
