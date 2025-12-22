@@ -99,6 +99,8 @@ class DownloaderConfig:
     """Configuration for video downloader (yt-dlp)."""
     
     proxy: Optional[str] = field(default_factory=lambda: os.getenv("YOUTUBE_PROXY", os.getenv("HTTP_PROXY")))
+    # Google Apps Script bridge URL for video validation (optional)
+    gas_bridge_url: Optional[str] = field(default_factory=lambda: os.getenv("GAS_BRIDGE_URL"))
 
 
 @dataclass
