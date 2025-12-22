@@ -175,17 +175,14 @@ def download_video(
         # Use video title from bridge or let yt-dlp extract it
         output_template = str(output_dir / "%(title)s.%(ext)s")
     
-    # Get base options with authentication (browser/cookies file)
-    ydl_opts = _get_base_ydl_opts()
-    
-    # Add download-specific options matching the user's preferred format
-    ydl_opts.update({
-        "format": format_preference,  # Default: "bestvideo+bestaudio/best"
-        "outtmpl": output_template,
-        "noplaylist": True,  # Don't download playlists
-        "merge_output_format": "mp4",  # Merge to mp4
-        "quiet": False,  # Show download progress
-    })
+    # Use SIMPLE options exactly like the working script
+    # DO NOT use extractor_args or player_client overrides - they trigger bot detection!
+    ydl_opts = {
+        'format': format_preference,  # Default: 'bestvideo+bestaudio/best'
+        'outtmpl': output_template,
+        'noplaylist': True,
+        'quiet': False,  # Show download progress
+    }
 
     print(f"⬇️  Starting download via yt-dlp...")
     
