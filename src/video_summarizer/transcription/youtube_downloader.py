@@ -1,5 +1,5 @@
 """
-YouTube video downloader using yt-dlp with optional Google Apps Script bridge validation.
+YouTube video downloader using yt-dlp with Google Apps Script bridge validation.
 """
 
 import os
@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 import requests
+import yt_dlp
+
+from video_summarizer.config import get_config
 
 
 class YouTubeDownloadError(Exception):
@@ -75,8 +78,6 @@ def validate_with_bridge(video_id: str, bridge_url: str, timeout: int = 10) -> D
     """
     Validate a YouTube video using the Google Apps Script bridge.
     
-    This helps bypass age-gating and provides validated video metadata.
-    
     Args:
         video_id: The YouTube video ID.
         bridge_url: The deployed Google Apps Script Web App URL.
@@ -114,17 +115,13 @@ def download_video(
     use_bridge: bool = True,
 ) -> str:
     """
-    Download a video from YouTube.
-    
-    Optionally validates the video using a Google Apps Script bridge first,
-    which helps bypass age-gating and provides validated metadata.
+    Download a video from YouTube using the EXACT working logic.
     
     Args:
         url: YouTube video URL.
         output_dir: Directory to save the video. If None, uses a temp directory.
         filename: Name for the output file (without extension). If None, uses video title.
         format_preference: yt-dlp format string for quality selection.
-            Default: "bestvideo+bestaudio/best" merges best video + audio.
         use_bridge: If True and GAS_BRIDGE_URL is configured, validates video first.
     
     Returns:
@@ -137,29 +134,21 @@ def download_video(
     if not is_youtube_url(url):
         raise ValueError(f"Not a valid YouTube URL: {url}")
     
-    # Import yt-dlp here to avoid import errors if not installed
-    try:
-        import yt_dlp
-    except ImportError:
-        raise YouTubeDownloadError(
-            "yt-dlp is not installed. Install it with: pip install yt-dlp"
-        )
-    
-    
     config = get_config()
     
-    # Optional: Validate via Google Apps Script bridge
+    # Extract video ID for bridge validation
+    video_id = extract_video_id(url)
     video_title = None
-    if use_bridge and config.downloader.gas_bridge_url:
-        video_id = extract_video_id(url)
-        if video_id:
-            try:
-                bridge_data = validate_with_bridge(video_id, config.downloader.gas_bridge_url)
-                video_title = bridge_data.get("title")
-                print(f"📹 Video validated: {video_title}")
-            except GASBridgeError as e:
-                print(f"⚠️  Bridge validation failed: {e}")
-                print("   Continuing with direct download...")
+    
+    # Optional: Validate via Google Apps Script bridge
+    if use_bridge and config.downloader.gas_bridge_url and video_id:
+        try:
+            bridge_data = validate_with_bridge(video_id, config.downloader.gas_bridge_url)
+            video_title = bridge_data.get("title")
+            print(f"📹 Video validated: {video_title}")
+        except GASBridgeError as e:
+            print(f"⚠️  Bridge validation failed: {e}")
+            print("   Continuing with direct download...")
     
     # Set up output directory
     if output_dir is None:
@@ -168,112 +157,50 @@ def download_video(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Configure yt-dlp options
+    # Configure yt-dlp options - EXACT same as working script
     if filename:
         output_template = str(output_dir / f"{filename}.%(ext)s")
     else:
-        # Use video title from bridge or let yt-dlp extract it
         output_template = str(output_dir / "%(title)s.%(ext)s")
     
-    # Use SIMPLE options exactly like the working script
-    # DO NOT use extractor_args or player_client overrides - they trigger bot detection!
+    # EXACT OPTIONS FROM WORKING SCRIPT - DO NOT MODIFY
     ydl_opts = {
-        'format': format_preference,  # Default: 'bestvideo+bestaudio/best'
+        'format': 'bestvideo+bestaudio/best', 
         'outtmpl': output_template,
         'noplaylist': True,
-        'quiet': False,  # Show download progress
+        'quiet': False,
     }
 
     print(f"⬇️  Starting download via yt-dlp...")
     
     try:
+        # USE ydl.download() - EXACTLY like the working script
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            
-            # Get the actual filename
+            ydl.download([url])
+        
+        # Find the downloaded file
+        for ext in ["mp4", "mkv", "webm", "m4a"]:
             if filename:
-                # Try common extensions
-                for ext in ["mp4", "mkv", "webm"]:
-                    potential_path = output_dir / f"{filename}.{ext}"
-                    if potential_path.exists():
-                        return str(potential_path)
-            
-            # Use the prepared filename from yt-dlp
-            downloaded_file = ydl.prepare_filename(info)
-            
-            # Handle merged files (yt-dlp changes extension to mp4)
-            if not Path(downloaded_file).exists():
-                # Try with .mp4 extension (merged format)
-                base = Path(downloaded_file).stem
-                merged_path = output_dir / f"{base}.mp4"
-                if merged_path.exists():
-                    return str(merged_path)
-            
-            final_title = video_title or info.get("title", "Unknown")
-            print(f"\n✅ SUCCESS: Video '{final_title}' downloaded!")
-            
-            return downloaded_file
+                potential_path = output_dir / f"{filename}.{ext}"
+            else:
+                # Look for any video file in the output directory
+                for f in output_dir.iterdir():
+                    if f.suffix.lower() in [".mp4", ".mkv", ".webm"]:
+                        print(f"\n✅ SUCCESS: Video downloaded to {f}")
+                        return str(f)
+        
+        # Fallback: return first video file found
+        for f in output_dir.iterdir():
+            if f.is_file() and f.suffix.lower() in [".mp4", ".mkv", ".webm", ".m4a"]:
+                print(f"\n✅ SUCCESS: Video downloaded to {f}")
+                return str(f)
+        
+        raise YouTubeDownloadError("Download completed but file not found")
             
     except yt_dlp.utils.DownloadError as e:
         raise YouTubeDownloadError(f"Failed to download video: {e}") from e
     except Exception as e:
         raise YouTubeDownloadError(f"Unexpected error during download: {e}") from e
-
-from video_summarizer.config import get_config
-
-
-def _get_base_ydl_opts() -> dict:
-    """
-    Get base yt-dlp options with authentication configuration.
-    
-    Returns:
-        Dictionary of yt-dlp options.
-    """
-    config = get_config()
-    
-    # Search for cookies.txt in likely locations
-    possible_paths = [
-        Path(os.getcwd()) / "cookies.txt",
-        Path(__file__).parents[3] / "cookies.txt", # src/video_summarizer -> root
-        Path("/teamspace/studios/this_studio/video_summarizer_backend/cookies.txt") # Absolute fallback
-    ]
-    
-    cookies_path = None
-    for path in possible_paths:
-        if path.exists():
-            cookies_path = path
-            break
-            
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "extract_flat": False,
-        "nocheckcertificate": True,
-        "ignoreerrors": True,
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "ios"]
-            }
-        }
-    }
-    
-    # Add proxy if configured
-    if config.downloader.proxy:
-        print(f"🌐 Using Proxy: {config.downloader.proxy}")
-        ydl_opts["proxy"] = config.downloader.proxy
-    
-    # Add authentication configuration
-    if cookies_path:
-        print(f"🍪 Found cookies at: {cookies_path}")
-        ydl_opts["cookiefile"] = str(cookies_path)
-    else:
-        print("⚠️  No cookies.txt found!")
-        print("   If you are running on a server/online machine, you MUST:")
-        print("   1. Export cookies from your local browser (use 'Get cookies.txt LOCALLY' extension)")
-        print(f"   2. Upload the file to: {os.getcwd()}/cookies.txt")
-        print("   Attempting to download without auth (may fail for age-gated/premium content)...")
-        
-    return ydl_opts
 
 
 def get_video_info(url: str) -> dict:
@@ -289,14 +216,10 @@ def get_video_info(url: str) -> dict:
     Raises:
         YouTubeDownloadError: If fetching info fails.
     """
-    try:
-        import yt_dlp
-    except ImportError:
-        raise YouTubeDownloadError(
-            "yt-dlp is not installed. Install it with: pip install yt-dlp"
-        )
-    
-    ydl_opts = _get_base_ydl_opts()
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+    }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
