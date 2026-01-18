@@ -131,8 +131,7 @@ sequenceDiagram
     rect rgb(255, 245, 230)
         Note over User,Storage: 2. Video Upload & Transcription
         User->>FE: Upload video/YouTube URL
-        FE->>API: POST /api/transcribe
-        Note right of API: Supports /file and /url endpoints
+        FE->>API: POST /api/transcribe/file or /url
         API->>DB: Create Job (status: pending)
         API-->>FE: job_id
         
@@ -218,7 +217,7 @@ sequenceDiagram
 
 | Layer | Technologies |
 |-------|-------------|
-| **Frontend** | React, Vite, Axios, Modern UI with Glassmorphism |
+| **Frontend** | React, Vite, Axios, Modern UI design with glassmorphism effects |
 | **Backend** | FastAPI, Python 3.9+, JWT Authentication |
 | **Database** | SQLite (SQLAlchemy ORM) |
 | **AI/ML** | Whisper Large v3 (faster-whisper), Google Gemini, OpenRouter (GPT/Claude/Llama) |
