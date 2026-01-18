@@ -1,389 +1,226 @@
 # Video Summarizer Architecture
 
-## 🎯 Simple Overview (Non-Technical)
+This document provides a comprehensive overview of the Video Summarizer system architecture through professional diagrams.
 
-This diagram shows how the Video Summarizer works at a high level:
+## 📐 System Architecture Overview
 
-```mermaid
-flowchart LR
-    subgraph You["👤 You"]
-        User[User]
-    end
-
-    subgraph WebApp["🌐 Web Application"]
-        Upload["📤 Upload Video<br/>or YouTube Link"]
-        Watch["👁️ View Results"]
-    end
-
-    subgraph Processing["⚙️ Processing Engine"]
-        Transcribe["🎤 Speech-to-Text<br/>(Whisper AI)"]
-        Summarize["📝 AI Summary<br/>(Gemini/GPT)"]
-        ClipExtract["✂️ Find Key Moments<br/>(AI + Video Cutting)"]
-        ChatBot["💬 Video ChatBot<br/>(Ask Questions)"]
-    end
-
-    subgraph Storage["💾 Your Library"]
-        SavedVideos["📚 Saved Videos"]
-        Transcripts["📄 Transcripts"]
-        Clips["🎬 Video Clips"]
-    end
-
-    User --> Upload
-    Upload --> Transcribe
-    Transcribe --> Summarize
-    Transcribe --> ClipExtract
-    Transcribe --> ChatBot
-    Summarize --> Watch
-    ClipExtract --> Watch
-    ChatBot --> Watch
-    Transcribe --> SavedVideos
-    Summarize --> Transcripts
-    ClipExtract --> Clips
-    Watch --> User
-
-    style You fill:#e3f2fd,stroke:#1976d2
-    style WebApp fill:#e8f5e9,stroke:#388e3c
-    style Processing fill:#fff3e0,stroke:#f57c00
-    style Storage fill:#fce4ec,stroke:#c2185b
-```
-
-### How It Works (Step by Step)
-
-| Step | What Happens | Technology Used |
-|:----:|--------------|-----------------|
-| 1️⃣ | **Upload** - You upload a video file or paste a YouTube link | Web Browser |
-| 2️⃣ | **Transcribe** - The system converts speech to text | Whisper AI (OpenAI's speech recognition) |
-| 3️⃣ | **Analyze** - AI reads the transcript and understands the content | Google Gemini / ChatGPT / Claude |
-| 4️⃣ | **Summarize** - AI creates a summary with key points | Same AI as above |
-| 5️⃣ | **Extract Clips** - AI identifies important moments, video editor cuts them out | AI + FFmpeg (video tool) |
-| 6️⃣ | **Chat** - You can ask questions about the video | AI with memory of conversation |
-| 7️⃣ | **Save** - Everything is saved to your library for later | Database |
-
-### Key Features Explained
-
-| Feature | What It Does |
-|---------|--------------|
-| 🎤 **Transcription** | Converts spoken words in video to written text (Arabic & English) |
-| 📝 **Summarization** | Creates a short summary + bullet points of main ideas |
-| ✂️ **Clip Extraction** | Finds the 3-5 most important moments and cuts them as separate videos |
-| 🔗 **Clip Merging** | Combines all the important clips into one highlight video |
-| 💬 **Video Chat** | Ask questions like "What did they say about X?" and get answers |
-| 📚 **Library** | Your processed videos are saved - no need to re-process them |
-| ⬇️ **Downloads** | Download extracted clips directly to your computer |
-
----
-
-## 🔧 Technical Architecture
-
-### Detailed Flowchart
+This diagram illustrates the complete system architecture, showing the interaction between frontend, backend, processing pipeline, and external services.
 
 ```mermaid
 flowchart TB
-    subgraph Frontend["🖥️ Frontend (React + Vite)"]
+    subgraph Client["👤 Client Layer"]
+        User[User/Browser]
+    end
+
+    subgraph Frontend["🖥️ Frontend Application<br/>(React + Vite)"]
         UI[Dashboard UI]
-        Auth[Login/Register Pages]
-        Upload[Upload Section]
+        Auth[Authentication]
+        Upload[Video Upload]
         Library[Video Library]
-        Results[Results Dashboard]
+        Results[Results Display]
         Chat[Chat Interface]
-        
-        UI --> Upload
-        UI --> Library
-        UI --> Results
-        Results --> Chat
     end
 
-    subgraph Hooks["React Hooks"]
-        useAuth[useAuth Hook]
-        useVideoProcessing[useVideoProcessing Hook]
-    end
-
-    subgraph APIService["API Service (axios)"]
-        transcribeFile[transcribeFile]
-        transcribeUrl[transcribeUrl]
-        transcribeExisting[transcribeExisting]
-        summarize[summarize]
-        extractClips[extractClips]
-        startChat[startChat]
-        sendMessage[sendMessage]
-        getLibrary[getLibrary]
-        getVideoDetails[getVideoDetails]
-    end
-
-    Frontend --> Hooks
-    Hooks --> APIService
-
-    subgraph Backend["🐍 FastAPI Backend"]
+    subgraph Backend["🐍 Backend Services<br/>(FastAPI)"]
         direction TB
         
-        subgraph AuthModule["Authentication"]
-            Register["/api/register"]
-            Login["/api/login"]
-            JWT[JWT Token Validation]
+        subgraph API["API Layer"]
+            AuthAPI[Auth Endpoints<br/>/api/register, /api/login]
+            TransAPI[Transcription Endpoints<br/>/api/transcribe/*]
+            ProcAPI[Processing Endpoints<br/>/api/summarize, /api/extract-clips]
+            ChatAPI[Chat Endpoints<br/>/api/chat/*]
+            LibAPI[Library Endpoints<br/>/api/library, /api/videos/*]
         end
 
-        subgraph TranscriptionAPI["Transcription Endpoints"]
-            TransFile["/api/transcribe/file"]
-            TransURL["/api/transcribe/url"]
-            TransExisting["/api/transcribe/existing"]
-        end
-
-        subgraph ProcessingAPI["Processing Endpoints"]
-            SummarizeAPI["/api/summarize"]
-            ClipsAPI["/api/extract-clips"]
-            ChatStartAPI["/api/chat/start"]
-            ChatMsgAPI["/api/chat/message"]
-        end
-
-        subgraph LibraryAPI["Library Endpoints"]
-            LibraryGet["/api/library"]
-            VideoDetails["/api/videos/{id}"]
-            ClipDownload["/api/clips/download"]
-        end
-
-        subgraph ConfigAPI["Configuration"]
-            Config["/api/config"]
+        subgraph Core["Core Processing"]
+            direction LR
+            Trans[Transcription<br/>Module]
+            LLM[LLM<br/>Module]
+            ChatMod[Chat<br/>Module]
         end
     end
 
-    APIService --> Backend
-
-    subgraph Database["💾 SQLite Database"]
-        Users[(Users Table)]
-        Videos[(Videos Table)]
-        Jobs[(Jobs Table)]
-        
-        Videos --> |has| Users
-        Jobs --> |has| Videos
-    end
-
-    Backend --> Database
-
-    subgraph VideoProcessor["🎬 Video Processing Pipeline"]
+    subgraph Processing["🎬 Video Processing Pipeline"]
         direction TB
-        
-        subgraph Transcription["Transcription Module"]
-            YouTubeDL[YouTube Downloader]
-            AudioExtract[Audio Extractor<br/>FFmpeg]
-            Whisper[Whisper Large v3<br/>faster-whisper]
-            SRTFormat[SRT Formatter]
-            
-            YouTubeDL --> AudioExtract
-            AudioExtract --> Whisper
-            Whisper --> SRTFormat
-        end
-
-        subgraph LLMModule["LLM Module"]
-            LLMClient[LLM Client]
-            GoogleAI[Google AI Client<br/>Gemini]
-            OpenRouter[OpenRouter Client<br/>Llama, GPT, Claude]
-            
-            LLMClient --> GoogleAI
-            LLMClient --> OpenRouter
-        end
-
-        subgraph Summarizer["Summarizer"]
-            SumPrompt[Summary Prompt]
-            SumParser[Response Parser]
-            SumPrompt --> LLMClient
-            LLMClient --> SumParser
-        end
-
-        subgraph ClipExtractor["Clip Extractor"]
-            ClipPrompt[Extract Clips Prompt]
-            ClipParser[Clip Parser]
-            FFmpegExtract[FFmpeg Extract]
-            FFmpegMerge[FFmpeg Merge]
-            
-            ClipPrompt --> LLMClient
-            LLMClient --> ClipParser
-            ClipParser --> FFmpegExtract
-            FFmpegExtract --> FFmpegMerge
-        end
-
-        subgraph ChatModule["Chat Module"]
-            ChatSession[Chat Session]
-            ChatHistory[Conversation History]
-            StreamResponse[Streaming Response]
-            
-            ChatSession --> ChatHistory
-            ChatHistory --> LLMClient
-            LLMClient --> StreamResponse
-        end
+        YT[YouTube<br/>Downloader]
+        Audio[Audio Extractor<br/>FFmpeg]
+        Whisper[Speech-to-Text<br/>Whisper Large v3]
+        Summary[AI Summarization<br/>Gemini/GPT/Claude]
+        Clips[Clip Extraction<br/>+ Merging]
     end
 
-    Backend --> VideoProcessor
+    subgraph Data["💾 Data Layer"]
+        DB[(SQLite DB<br/>Users, Videos, Jobs)]
+        Files[File Storage<br/>Videos, Transcripts, Clips]
+    end
 
-    subgraph ExternalAPIs["🌐 External APIs"]
-        GoogleAPI[Google AI Studio API]
-        OpenRouterAPI[OpenRouter API]
+    subgraph External["🌐 External Services"]
+        GoogleAI[Google AI<br/>Gemini]
+        OpenRouter[OpenRouter<br/>GPT/Claude/Llama]
         YouTube[YouTube]
     end
 
-    VideoProcessor --> ExternalAPIs
+    User --> Frontend
+    Frontend <--> API
+    API --> Core
+    Core --> Processing
+    Processing --> Data
+    Core <--> External
+    Processing --> External
+    
+    Trans --> YT
+    Trans --> Audio
+    Trans --> Whisper
+    LLM --> Summary
+    LLM --> Clips
+    
+    YT -.-> YouTube
+    Summary -.-> GoogleAI
+    Summary -.-> OpenRouter
+    Clips -.-> GoogleAI
+    Clips -.-> OpenRouter
+    ChatMod -.-> GoogleAI
+    ChatMod -.-> OpenRouter
 
-    subgraph Storage["📁 File Storage"]
-        OutputDir[output/]
-        VideoFiles[Video Files]
-        TranscriptFiles[Transcript SRT]
-        ClipFiles[Extracted Clips]
-        MergedClip[Merged Clip]
-        
-        OutputDir --> VideoFiles
-        OutputDir --> TranscriptFiles
-        OutputDir --> ClipFiles
-        OutputDir --> MergedClip
-    end
-
-    VideoProcessor --> Storage
-    Backend --> Storage
-
-    %% Styling
-    classDef frontend fill:#61dafb,stroke:#333,color:#000
-    classDef backend fill:#009688,stroke:#333,color:#fff
-    classDef database fill:#ff9800,stroke:#333,color:#000
-    classDef processor fill:#9c27b0,stroke:#333,color:#fff
-    classDef external fill:#f44336,stroke:#333,color:#fff
-    classDef storage fill:#4caf50,stroke:#333,color:#fff
-
-    class Frontend frontend
-    class Backend backend
-    class Database database
-    class VideoProcessor processor
-    class ExternalAPIs external
-    class Storage storage
+    style Client fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Frontend fill:#bbdefb,stroke:#1976d2,stroke-width:2px
+    style Backend fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style Processing fill:#fff9c4,stroke:#f57c00,stroke-width:2px
+    style Data fill:#ffccbc,stroke:#d84315,stroke-width:2px
+    style External fill:#f8bbd0,stroke:#c2185b,stroke-width:2px
 ```
 
-## Data Flow
+### Key Features
+
+| Component | Capabilities |
+|-----------|-------------|
+| 🎤 **Transcription** | Speech-to-text conversion using Whisper AI (Arabic & English support) |
+| 📝 **Summarization** | AI-powered video summaries with key points extraction |
+| ✂️ **Clip Extraction** | Automated identification and extraction of important video segments |
+| 🔗 **Clip Merging** | Combine multiple clips into a single highlight video |
+| 💬 **Interactive Chat** | Q&A interface with video context awareness and streaming responses |
+| 📚 **Video Library** | Persistent storage with caching for processed videos and results |
+| 🔐 **Authentication** | Secure JWT-based user authentication and session management |
+| 🌐 **YouTube Support** | Direct processing of YouTube URLs with auto-download |
+
+---
+
+## 🔄 Data Flow & Processing Pipeline
+
+This sequence diagram shows the end-to-end data flow for the complete video processing lifecycle.
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant FE as Frontend
-    participant BE as Backend
+    actor User
+    participant FE as Frontend<br/>(React)
+    participant API as FastAPI<br/>Backend
     participant DB as Database
-    participant VP as Video Processor
-    participant LLM as LLM Provider
-    participant FS as File Storage
+    participant Trans as Transcription<br/>Engine
+    participant LLM as LLM Provider<br/>(Gemini/GPT)
+    participant Storage as File Storage
 
-    Note over U,FS: Video Upload & Transcription Flow
-    U->>FE: Upload video / YouTube URL
-    FE->>BE: POST /api/transcribe/file
-    BE->>DB: Create Job (pending)
-    BE-->>FE: Return job_id
-    
-    BE->>VP: Background: process_transcription()
-    VP->>FS: Save video file
-    VP->>VP: Extract audio (FFmpeg)
-    VP->>VP: Transcribe (Whisper)
-    VP->>FS: Save SRT transcript
-    VP->>DB: Update Job (completed)
-    VP->>DB: Create Video entry
-    
-    FE->>BE: Poll GET /api/jobs/{id}
-    BE->>DB: Get job status
-    BE-->>FE: Return results
+    rect rgb(230, 240, 255)
+        Note over User,Storage: 1. Authentication & Setup
+        User->>FE: Login/Register
+        FE->>API: POST /api/login
+        API->>DB: Validate credentials
+        DB-->>API: User data
+        API-->>FE: JWT token
+    end
 
-    Note over U,FS: Summarization Flow
-    U->>FE: Click "Summarize"
-    FE->>BE: POST /api/summarize
-    BE->>LLM: Send transcript + prompt
-    LLM-->>BE: Return summary JSON
-    BE->>DB: Save to Video.summary_text
-    BE-->>FE: Return summary
+    rect rgb(255, 245, 230)
+        Note over User,Storage: 2. Video Upload & Transcription
+        User->>FE: Upload video/YouTube URL
+        FE->>API: POST /api/transcribe/file or /url
+        API->>DB: Create Job (status: pending)
+        API-->>FE: job_id
+        
+        API->>Trans: Start transcription (background)
+        Trans->>Storage: Save video file
+        Trans->>Trans: Extract audio (FFmpeg)
+        Trans->>Trans: Transcribe audio (Whisper)
+        Trans->>Storage: Save SRT transcript
+        Trans->>DB: Update Job (status: completed)
+        Trans->>DB: Create Video entry
+        
+        loop Poll for completion
+            FE->>API: GET /api/jobs/{job_id}
+            API->>DB: Check job status
+            DB-->>API: Job status + results
+            API-->>FE: Status update
+        end
+    end
 
-    Note over U,FS: Clip Extraction Flow
-    U->>FE: Click "Extract Clips"
-    FE->>BE: POST /api/extract-clips
-    BE->>LLM: Send transcript + prompt
-    LLM-->>BE: Return clips JSON
-    BE->>VP: Extract clips (FFmpeg)
-    VP->>FS: Save clip files
-    VP->>VP: Merge clips (if requested)
-    VP->>FS: Save merged.mp4
-    BE->>DB: Save to Video.clips_data
-    BE-->>FE: Return clips + file paths
+    rect rgb(240, 255, 240)
+        Note over User,Storage: 3. AI Summarization
+        User->>FE: Request summary
+        FE->>API: POST /api/summarize
+        API->>DB: Get transcript
+        API->>LLM: Generate summary (transcript + prompt)
+        LLM-->>API: Summary JSON
+        API->>DB: Cache summary
+        API-->>FE: Summary result
+        FE->>User: Display summary
+    end
 
-    Note over U,FS: Chat Flow
-    U->>FE: Click "Chat"
-    FE->>BE: POST /api/chat/start
-    BE->>BE: Create ChatSession
-    BE-->>FE: Return session_id
-    
-    U->>FE: Send message
-    FE->>BE: POST /api/chat/message
-    BE->>LLM: Stream response
-    LLM-->>BE: Streaming chunks
-    BE-->>FE: Stream to client
+    rect rgb(255, 240, 245)
+        Note over User,Storage: 4. Clip Extraction & Merging
+        User->>FE: Extract clips (with merge option)
+        FE->>API: POST /api/extract-clips
+        API->>LLM: Identify key moments (transcript + prompt)
+        LLM-->>API: Clips metadata (timestamps, descriptions)
+        API->>Trans: Extract clips (FFmpeg)
+        Trans->>Storage: Save individual clips
+        
+        opt Merge requested
+            Trans->>Trans: Merge clips (FFmpeg concat)
+            Trans->>Storage: Save merged.mp4
+        end
+        
+        API->>DB: Cache clips data
+        API-->>FE: Clips info + download URLs
+        FE->>User: Display clips with download links
+    end
 
-    Note over U,FS: Library Reuse Flow
-    U->>FE: Select from Library
-    FE->>BE: GET /api/videos/{id}
-    BE->>DB: Get Video with cached data
-    BE-->>FE: Return video + summary + clips
-    FE->>FE: Display cached results
+    rect rgb(250, 240, 255)
+        Note over User,Storage: 5. Interactive Chat
+        User->>FE: Open chat
+        FE->>API: POST /api/chat/start
+        API->>API: Create ChatSession
+        API-->>FE: session_id
+        
+        loop Conversation
+            User->>FE: Send message
+            FE->>API: POST /api/chat/message
+            Note right of API: Streaming response
+            API->>LLM: Query with context (transcript + history)
+            LLM-->>API: Stream response chunks
+            API-->>FE: Stream to client
+            FE->>User: Display streaming response
+        end
+    end
+
+    rect rgb(245, 245, 245)
+        Note over User,Storage: 6. Library Access (Cached Results)
+        User->>FE: Select video from library
+        FE->>API: GET /api/videos/{video_id}
+        API->>DB: Fetch video with cached results
+        DB-->>API: Video + summary + clips
+        API-->>FE: Complete video data
+        FE->>User: Instant display (no reprocessing)
+    end
 ```
 
-## Component Diagram
+---
 
-```mermaid
-graph LR
-    subgraph "Frontend Components"
-        App[App.jsx]
-        Dashboard[Dashboard.jsx]
-        UploadSection[UploadSection.jsx]
-        FeatureToggles[FeatureToggles.jsx]
-        ResultsDashboard[ResultsDashboard.jsx]
-        ChatInterface[ChatInterface.jsx]
-        LogTerminal[LogTerminal.jsx]
-    end
+## 🧩 Technology Stack
 
-    subgraph "Backend Modules"
-        API[api/main.py]
-        AuthMod[api/auth.py]
-        DBModels[db/models.py]
-        Config[config.py]
-    end
-
-    subgraph "Processing Modules"
-        Transcriber[transcription/transcriber.py]
-        AudioExtractor[transcription/audio_extractor.py]
-        YouTubeDownloader[transcription/youtube_downloader.py]
-        SRTFormatter[transcription/srt_formatter.py]
-    end
-
-    subgraph "LLM Modules"
-        LLMClient[llm/client.py]
-        Summarizer[llm/summarizer.py]
-        ClipExtractor[llm/clip_extractor.py]
-        ChatMod[llm/chat.py]
-        Prompts[llm/prompts.py]
-        Models[llm/models.py]
-    end
-
-    App --> Dashboard
-    Dashboard --> UploadSection
-    Dashboard --> FeatureToggles
-    Dashboard --> ResultsDashboard
-    Dashboard --> LogTerminal
-    ResultsDashboard --> ChatInterface
-
-    API --> AuthMod
-    API --> DBModels
-    API --> Config
-    API --> Transcriber
-    API --> Summarizer
-    API --> ClipExtractor
-    API --> ChatMod
-
-    Transcriber --> AudioExtractor
-    Transcriber --> YouTubeDownloader
-    Transcriber --> SRTFormatter
-
-    Summarizer --> LLMClient
-    ClipExtractor --> LLMClient
-    ChatMod --> LLMClient
-    LLMClient --> Prompts
-    Summarizer --> Models
-    ClipExtractor --> Models
-```
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React, Vite, Axios, Modern UI design with glassmorphism effects |
+| **Backend** | FastAPI, Python 3.9+, JWT Authentication |
+| **Database** | SQLite (SQLAlchemy ORM) |
+| **AI/ML** | Whisper Large v3 (faster-whisper), Google Gemini, OpenRouter (GPT/Claude/Llama) |
+| **Video Processing** | FFmpeg (audio extraction, clip cutting, video merging) |
+| **External APIs** | YouTube, Google AI Studio, OpenRouter |
+| **File Storage** | Local filesystem (output/ directory) |
