@@ -131,7 +131,7 @@ sequenceDiagram
     rect rgb(255, 245, 230)
         Note over User,Storage: 2. Video Upload & Transcription
         User->>FE: Upload video/YouTube URL
-        FE->>API: POST /api/transcribe/file or /url
+        FE->>API: POST /api/transcribe/file<br/>POST /api/transcribe/url
         API->>DB: Create Job (status: pending)
         API-->>FE: job_id
         
