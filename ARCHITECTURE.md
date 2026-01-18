@@ -131,7 +131,8 @@ sequenceDiagram
     rect rgb(255, 245, 230)
         Note over User,Storage: 2. Video Upload & Transcription
         User->>FE: Upload video/YouTube URL
-        FE->>API: POST /api/transcribe/file<br/>POST /api/transcribe/url
+        FE->>API: POST /api/transcribe
+        Note right of API: Supports /file and /url endpoints
         API->>DB: Create Job (status: pending)
         API-->>FE: job_id
         
@@ -191,7 +192,8 @@ sequenceDiagram
         
         loop Conversation
             User->>FE: Send message
-            FE->>API: POST /api/chat/message (streaming)
+            FE->>API: POST /api/chat/message
+            Note right of API: Streaming response
             API->>LLM: Query with context (transcript + history)
             LLM-->>API: Stream response chunks
             API-->>FE: Stream to client
